@@ -1,8 +1,8 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Beautiful Infinite Jump & Run — Working Combat</title>
+<title>Beautiful Infinite Jump & Run — Working Combat (WASD + Touch)</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
 html,body{
@@ -42,6 +42,13 @@ canvas{display:block}
 }
 #death h1{margin:0 0 10px;font-size:28px}
 #death p{margin:4px 0;opacity:.8}
+
+/* small touch hint at bottom for mobile */
+#touchHint{
+  position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
+  background:rgba(255,255,255,0.02);padding:8px 12px;border-radius:12px;font-size:12px;color:#cfe;
+  backdrop-filter:blur(6px)
+}
 </style>
 </head>
 <body>
@@ -61,7 +68,7 @@ canvas{display:block}
     <b id="boost">READY</b>
   </div>
   <div class="row label">
-    ← → move · ↑ jump · B boost · S shoot · R restart
+    ← → / A D move · ↑ / W jump · S shoot · Tap enemies to kill/jump · Swipe to move
   </div>
 </div>
 
@@ -73,8 +80,14 @@ canvas{display:block}
   </div>
 </div>
 
+<div id="touchHint">Tippe Gegner zum töten oder springen · W/A/S/D oder Pfeile · Swipe bewegt</div>
+
 <script>
-/* Full single-file game: functional shooting + enemies + design retained */
+/* Full single-file game with added:
+   - WASD controls (A/D = left/right, W = jump, S = shoot)
+   - Pointer/touch support: swipe to move, tap to kill/bounce on enemy
+   - Click (mouse) on enemies to kill and bounce
+*/
 
 /* ====== Canvas / DOM refs ====== */
 const c = document.getElementById('c'), ctx = c.getContext('2d');
@@ -101,6 +114,78 @@ addEventListener('keydown', e => {
   if (e.code === 'KeyR') restart();
 });
 addEventListener('keyup', e => keys[e.code] = false);
+
+// Pointer/touch handling
+let activePointer = null;
+let pointerStart = null;
+let pointerMoved = false;
+const SWIPE_DEADZONE = 18; // px
+const TAP_TIME = 300; // ms
+const TAP_MOVE_THRESHOLD = 12; // px
+
+addEventListener('pointerdown', e => {
+  // only handle primary pointer
+  if (activePointer !== null) return;
+  activePointer = e.pointerId;
+  pointerStart = { x: e.clientX, y: e.clientY, t: performance.now() };
+  pointerMoved = false;
+  // capture so we continue to get move/up
+  try { (e.target).setPointerCapture(activePointer); } catch (err) {}
+  // immediate directional set on pointerdown for quick swipes
+  updatePointerMovement(e.clientX, e.clientY);
+});
+
+addEventListener('pointermove', e => {
+  if (activePointer !== e.pointerId) return;
+  pointerMoved = pointerMoved || (Math.hypot(e.clientX - pointerStart.x, e.clientY - pointerStart.y) > TAP_MOVE_THRESHOLD);
+  updatePointerMovement(e.clientX, e.clientY);
+});
+
+addEventListener('pointerup', e => {
+  if (activePointer !== e.pointerId) return;
+  const duration = performance.now() - pointerStart.t;
+  const dx = e.clientX - pointerStart.x, dy = e.clientY - pointerStart.y;
+  // Tap detection
+  if (duration < TAP_TIME && Math.hypot(dx, dy) < TAP_MOVE_THRESHOLD) {
+    handleTap(e.clientX, e.clientY);
+  } else {
+    // swipe up detection (end)
+    if (dy < -SWIPE_DEADZONE) {
+      // jump on swipe-up
+      if (player.on) { player.vy = -player.jump; player.on = false; }
+    }
+  }
+  // clear movement keys set by pointer
+  keys['ArrowLeft'] = keys['ArrowRight'] = keys['KeyA'] = keys['KeyD'] = false;
+  activePointer = null;
+  pointerStart = null;
+  pointerMoved = false;
+  try { (e.target).releasePointerCapture(e.pointerId); } catch (err) {}
+});
+
+addEventListener('pointercancel', e => {
+  if (activePointer !== e.pointerId) return;
+  keys['ArrowLeft'] = keys['ArrowRight'] = keys['KeyA'] = keys['KeyD'] = false;
+  activePointer = null; pointerStart = null; pointerMoved = false;
+});
+
+function updatePointerMovement(px, py){
+  if (!pointerStart) return;
+  const dx = px - pointerStart.x, dy = py - pointerStart.y;
+  // horizontal swipe/drag => move while dragging left/right
+  if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_DEADZONE) {
+    if (dx < 0) {
+      keys['ArrowLeft'] = true; keys['KeyA'] = true;
+      keys['ArrowRight'] = false; keys['KeyD'] = false;
+    } else {
+      keys['ArrowRight'] = true; keys['KeyD'] = true;
+      keys['ArrowLeft'] = false; keys['KeyA'] = false;
+    }
+  } else {
+    // if vertical dominant, don't force horizontal keys
+    keys['ArrowLeft'] = keys['ArrowRight'] = keys['KeyA'] = keys['KeyD'] = false;
+  }
+}
 
 /* ====== Player ====== */
 const player = {
@@ -159,12 +244,12 @@ function update(){
   tick++; dist += speed;
   if (tick % 600 === 0) speed = Math.min(10, speed + 0.3);
 
-  // horizontal input
-  if (keys['ArrowLeft']) player.vx -= player.acc;
-  if (keys['ArrowRight']) player.vx += player.acc;
+  // horizontal input (arrow keys OR WASD)
+  if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= player.acc;
+  if (keys['ArrowRight'] || keys['KeyD']) player.vx += player.acc;
 
-  // jump
-  if ((keys['Space'] || keys['ArrowUp']) && player.on){
+  // jump (Space, ArrowUp, W)
+  if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.on){
     player.vy = -player.jump;
     player.on = false;
   }
@@ -179,11 +264,9 @@ function update(){
     boostEl.textContent = 'BOOSTING';
   }
   if (player.boosting){
-    // guaranteed upward thrust and slight forward control
     player.vy = -3.6;
-    // slight forward push for nicer feel
-    if (keys['ArrowRight']) player.vx += 0.6;
-    if (keys['ArrowLeft']) player.vx -= 0.6;
+    if (keys['ArrowRight'] || keys['KeyD']) player.vx += 0.6;
+    if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= 0.6;
     if (now > boostUntil){
       player.boosting = false;
       boostEl.textContent = 'COOLDOWN';
@@ -193,9 +276,8 @@ function update(){
     boostEl.textContent = 'READY';
   }
 
-  // shooting (S): rate-limited
+  // shooting (S): rate-limited. Note: KeyS also used for "tap" on touch; here it's keyboard shoot.
   if (keys['KeyS'] && now - lastShot > SHOT_CD){
-    // spawn bullet from player
     bullets.push({
       x: player.x + player.w,
       y: player.y + player.h * 0.45,
@@ -223,15 +305,12 @@ function update(){
   // simple enemy behavior: bob and sometimes shoot toward player
   for (const e of enemies){
     e.timer = (e.timer || 0) + 1;
-    // bobbing
     e.oy = e.oy || e.y;
     e.y = e.oy + Math.sin((tick + (e.id||0)*57) * 0.04) * 8;
-    // shoot occasionally if on screen and cooldown
     e.shootTimer = e.shootTimer || 0;
     if (e.x < c.width + 100 && e.x > -50){
       e.shootTimer--;
       if (e.shootTimer <= 0){
-        // enemy shoots a bullet leftwards (world scroll already moves it)
         bullets.push({
           x: e.x,
           y: e.y + e.h/2,
@@ -239,7 +318,7 @@ function update(){
           owner: 'enemy',
           w: 8, h: 4
         });
-        e.shootTimer = rndInt(60, 180); // frames until next shot
+        e.shootTimer = rndInt(60, 180);
       }
     }
   }
@@ -268,7 +347,17 @@ function update(){
   if (dead) return;
 
   for (const e of enemies){
-    if (rectHit(player, e)) { die('ENEMY BONK'); break; }
+    if (!e.dead && rectHit(player, e)) {
+      // if player is falling onto the enemy (vertical collision from above), bounce and kill enemy
+      if (player.vy > 0 && (player.y + player.h - player.vy) <= e.y + 6) {
+        killEnemy(e, true);
+        player.vy = -player.jump * 0.6; // bounce up
+        player.on = false;
+      } else {
+        die('ENEMY BONK');
+        break;
+      }
+    }
   }
   if (dead) return;
 
@@ -280,16 +369,13 @@ function update(){
   }
   if (dead) return;
 
-  // bullets vs enemies: player bullets kill enemies, enemy bullets destroyed by player (handled above)
+  // bullets vs enemies: player bullets kill enemies
   for (const b of bullets){
     if (b.owner === 'player'){
       for (const e of enemies){
         if (!e.dead && rectHit(b, e)){
-          // mark enemy dead and spawn particles
-          e.dead = true;
-          e.dieTimer = 30;
+          killEnemy(e, false);
           b.dead = true;
-          spawnParticles(e.x + e.w/2, e.y + e.h/2, 14, '#ffd66b');
           break;
         }
       }
@@ -298,7 +384,6 @@ function update(){
 
   // cleanup: remove dead bullets/enemies offscreen
   bullets = bullets.filter(b => !b.dead && b.x < c.width + 200 && b.x > -400);
-  // enemies: allow death animation then remove
   enemies = enemies.filter(e => {
     if (e.dead){
       e.dieTimer--;
@@ -328,6 +413,45 @@ function update(){
   scoreEl.textContent = Math.floor(dist);
 }
 
+/* ====== Enemy kill helper ====== */
+function killEnemy(e, bouncePlayer){
+  if (!e || e.dead) return;
+  e.dead = true;
+  e.dieTimer = 30;
+  spawnParticles(e.x + e.w/2, e.y + e.h/2, 14, '#ffd66b');
+  // optional small reward or effect
+  // bounce player lightly if bouncePlayer true or if tap killed
+  if (bouncePlayer) {
+    player.vy = -player.jump * 0.6;
+    player.on = false;
+  }
+}
+
+/* ====== Tap / Click handling ====== */
+function handleTap(clientX, clientY){
+  // convert to canvas coords (same here)
+  const x = clientX, y = clientY;
+  // find topmost enemy under the tap (iterate reverse)
+  for (let i = enemies.length - 1; i >= 0; i--){
+    const e = enemies[i];
+    if (!e.dead && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h){
+      // kill and bounce player upward
+      killEnemy(e, true);
+      return;
+    }
+  }
+  // if not an enemy, consider shooting toward tapped location
+  // spawn a bullet heading roughly right (same behavior as keyboard shoot)
+  bullets.push({
+    x: player.x + player.w,
+    y: player.y + player.h * 0.45,
+    vx: 12,
+    owner: 'player',
+    w: 10, h: 4
+  });
+  lastShot = performance.now();
+}
+
 /* ====== Spawn logic (guaranteed doable) ====== */
 function spawnNext(){
   const last = plats.at(-1);
@@ -342,7 +466,6 @@ function spawnNext(){
     spikes.push({ x: x - rndInt(40, Math.max(60, gap - 20)), y: c.height - 44, w: 30, h: 30 });
   }
 
-  // sometimes spawn an enemy on the platform, guaranteed reachable
   if (Math.random() < 0.32){
     const ex = x + rndInt(40, Math.max(40, w - 40));
     const ey = y - 30;
@@ -372,10 +495,9 @@ function draw(){
     ctx.fillRect((tick*0.18 + i*200) % c.width, i * 30, 80, 2);
   }
 
-  // draw platforms with modern style
+  // draw platforms
   for (const pl of plats){
     ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 14;
-    // gradient platform
     const pg = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y + pl.h);
     pg.addColorStop(0, '#6a74ff'); pg.addColorStop(1, '#3a40d6');
     ctx.fillStyle = pg;
@@ -394,15 +516,12 @@ function draw(){
   // enemies (alive or dying)
   for (const e of enemies){
     if (!e.dead){
-      // body
       ctx.fillStyle = '#ffcc33';
       roundRect(ctx, e.x, e.y, e.w, e.h, 6, true, false);
-      // eyes
       ctx.fillStyle = '#2b1b00';
       ctx.fillRect(e.x + 6, e.y + 8, 4, 6);
       ctx.fillRect(e.x + e.w - 10, e.y + 8, 4, 6);
     } else {
-      // dying: fade & shrink
       const t = e.dieTimer / 30;
       ctx.globalAlpha = t;
       ctx.fillStyle = '#ffb93b';
@@ -414,10 +533,8 @@ function draw(){
   // bullets
   for (const b of bullets){
     if (b.owner === 'player'){
-      // player bullets glow cyan
       ctx.fillStyle = '#66ffff';
       ctx.fillRect(b.x, b.y, b.w, b.h);
-      // glow
       ctx.globalAlpha = 0.15;
       ctx.fillRect(b.x - 6, b.y - 2, b.w + 12, b.h + 4);
       ctx.globalAlpha = 1;
@@ -439,16 +556,13 @@ function draw(){
   ctx.save();
   ctx.translate(player.x + player.w/2, player.y + player.h/2);
   if (player.boosting){
-    // aura
     ctx.fillStyle = 'rgba(102,255,255,0.08)';
     ctx.beginPath();
     ctx.ellipse(0, 6, player.w + 18, player.h + 26, 0, 0, Math.PI * 2);
     ctx.fill();
   }
-  // body
   ctx.fillStyle = player.boosting ? '#66ffff' : '#66ff99';
   roundRect(ctx, -player.w/2, -player.h/2, player.w, player.h, 8, true, false);
-  // eyes & mouth
   ctx.fillStyle = '#000';
   ctx.fillRect(-6, -6, 4, 6);
   ctx.fillRect(4, -6, 4, 6);
@@ -469,7 +583,6 @@ function die(reason){
   deathText.textContent = reason;
   deathSub.textContent = `Distance ${d} · High ${high}`;
   deathEl.style.display = 'flex';
-  // auto restart after short delay
   setTimeout(()=>{ restart(); }, 900);
 }
 
@@ -519,10 +632,14 @@ function spawnParticles(x,y,count,color){
   }
 }
 
+/* ====== Mouse click fallback (desktop) ====== */
+addEventListener('click', e => {
+  handleTap(e.clientX, e.clientY);
+});
+
 /* ====== Main loop ====== */
 function loop(){
   update();
-  // clear canvas each frame (we redraw entire scene)
   ctx.clearRect(0,0,c.width,c.height);
   draw();
   requestAnimationFrame(loop);
