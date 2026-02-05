@@ -1,8 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="de">
 <head>
 <meta charset="utf-8" />
-<title>Beautiful Infinite Jump & Run — Working Combat (WASD + Touch)</title>
+<title>Beautiful Infinite Jump & Run — Massive Maps & Powerups</title>
 <meta name="viewport" content="width=device-width,initial-scale=1" />
 <style>
 html,body{
@@ -14,42 +15,52 @@ canvas{display:block}
 
 /* Glass HUD */
 #ui{
-  position:fixed;left:16px;top:16px;
-  backdrop-filter:blur(14px);
-  background:rgba(20,25,40,.55);
-  border-radius:14px;
-  padding:14px 18px;
-  box-shadow:0 20px 40px rgba(0,0,0,.4);
-  font-size:14px
+position:fixed;left:16px;top:16px;
+backdrop-filter:blur(14px);
+background:rgba(20,25,40,.55);
+border-radius:14px;
+padding:14px 18px;
+box-shadow:0 20px 40px rgba(0,0,0,.4);
+font-size:14px;
+color:#dff;
+width:360px;
 }
-.row{margin-bottom:6px}
-.label{opacity:.7}
+.row{margin-bottom:6px;display:flex;align-items:center;gap:10px}
+.label{opacity:.8;min-width:66px}
+.stat{font-weight:700;min-width:70px}
 
 /* Death overlay */
 #death{
-  position:fixed;inset:0;
-  display:none;
-  align-items:center;
-  justify-content:center;
-  background:radial-gradient(circle at center,rgba(0,0,0,.6),rgba(0,0,0,.95))
+position:fixed;inset:0;
+display:none;
+align-items:center;
+justify-content:center;
+background:radial-gradient(circle at center,rgba(0,0,0,.6),rgba(0,0,0,.95))
 }
 #death .box{
-  background:linear-gradient(145deg,#14192a,#0a0e1c);
-  border-radius:20px;
-  padding:28px 36px;
-  box-shadow:0 30px 80px rgba(0,0,0,.7);
-  text-align:center
+background:linear-gradient(145deg,#14192a,#0a0e1c);
+border-radius:20px;
+padding:28px 36px;
+box-shadow:0 30px 80px rgba(0,0,0,.7);
+text-align:center
 }
 #death h1{margin:0 0 10px;font-size:28px}
 #death p{margin:4px 0;opacity:.8}
 
 /* small touch hint at bottom for mobile */
 #touchHint{
-  position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
-  background:rgba(255,255,255,0.02);padding:8px 12px;border-radius:12px;font-size:12px;color:#cfe;
-  backdrop-filter:blur(6px)
+position:fixed;left:50%;transform:translateX(-50%);bottom:18px;
+background:rgba(255,255,255,0.02);padding:8px 12px;border-radius:12px;font-size:12px;color:#cfe;
+backdrop-filter:blur(6px)
 }
-</style>
+
+/* mini in-game messages */
+#msg{
+position:fixed;left:50%;top:24px;transform:translateX(-50%);
+color:#fff;padding:6px 12px;border-radius:12px;background:rgba(0,0,0,.4);backdrop-filter:blur(6px);
+font-weight:700;display:none;
+} </style>
+
 </head>
 <body>
 
@@ -58,19 +69,31 @@ canvas{display:block}
 <div id="ui">
   <div class="row">
     <span class="label">Distance</span>
-    <b id="score">0</b>
-    &nbsp;|&nbsp;
+    <b id="score" class="stat">0</b>
     <span class="label">High</span>
-    <b id="high">0</b>
+    <b id="high" class="stat">0</b>
   </div>
+
   <div class="row">
-    <span class="label">Boost</span>
-    <b id="boost">READY</b>
+    <span class="label">Leben</span>
+    <b id="lives" class="stat">3</b>
+    <span class="label">Multiplier</span>
+    <b id="mult" class="stat">x1</b>
   </div>
+
+  <div class="row">
+    <span class="label">Schirm</span>
+    <b id="shield" class="stat">OFF</b>
+    <span class="label">Boost</span>
+    <b id="boost" class="stat">READY</b>
+  </div>
+
   <div class="row label">
-    ← → / A D move · ↑ / W jump · S shoot · Tap enemies to kill/jump · Swipe to move
+    ← → / A D move · ↑ / W jump · S shoot · Tippe Gegner zum töten/jump · Swipe bewegt
   </div>
 </div>
+
+<div id="msg"></div>
 
 <div id="death">
   <div class="box">
@@ -83,10 +106,12 @@ canvas{display:block}
 <div id="touchHint">Tippe Gegner zum töten oder springen · W/A/S/D oder Pfeile · Swipe bewegt</div>
 
 <script>
-/* Full single-file game with added:
-   - WASD controls (A/D = left/right, W = jump, S = shoot)
-   - Pointer/touch support: swipe to move, tap to kill/bounce on enemy
-   - Click (mouse) on enemies to kill and bounce
+/* Enhanced single-file game:
+   - 3 Leben
+   - Tötung eines Gegners: Multiplikator x2 für 10s + Schirm (Unsterblich) 3s
+   - Shield visuals & temporary invulnerability on respawn
+   - Multiple map themes (Wüste, Schlamm, Wald, City, Night, ...), switch beim Fortschritt
+   - Cleanly integrated into the existing architecture
 */
 
 /* ====== Canvas / DOM refs ====== */
@@ -97,13 +122,17 @@ const boostEl = document.getElementById('boost');
 const deathEl = document.getElementById('death');
 const deathText = document.getElementById('deathText');
 const deathSub = document.getElementById('deathSub');
+const livesEl = document.getElementById('lives');
+const multEl = document.getElementById('mult');
+const shieldEl = document.getElementById('shield');
+const msgEl = document.getElementById('msg');
 
 function resize(){ c.width = innerWidth; c.height = innerHeight; }
 addEventListener('resize', resize);
 resize();
 
 /* ====== Storage ====== */
-const STORE = 'beautiful_jump_high_v2';
+const STORE = 'beautiful_jump_high_v3';
 let high = +localStorage.getItem(STORE) || 0;
 highEl.textContent = high;
 
@@ -124,14 +153,11 @@ const TAP_TIME = 300; // ms
 const TAP_MOVE_THRESHOLD = 12; // px
 
 addEventListener('pointerdown', e => {
-  // only handle primary pointer
   if (activePointer !== null) return;
   activePointer = e.pointerId;
   pointerStart = { x: e.clientX, y: e.clientY, t: performance.now() };
   pointerMoved = false;
-  // capture so we continue to get move/up
   try { (e.target).setPointerCapture(activePointer); } catch (err) {}
-  // immediate directional set on pointerdown for quick swipes
   updatePointerMovement(e.clientX, e.clientY);
 });
 
@@ -145,17 +171,13 @@ addEventListener('pointerup', e => {
   if (activePointer !== e.pointerId) return;
   const duration = performance.now() - pointerStart.t;
   const dx = e.clientX - pointerStart.x, dy = e.clientY - pointerStart.y;
-  // Tap detection
   if (duration < TAP_TIME && Math.hypot(dx, dy) < TAP_MOVE_THRESHOLD) {
     handleTap(e.clientX, e.clientY);
   } else {
-    // swipe up detection (end)
     if (dy < -SWIPE_DEADZONE) {
-      // jump on swipe-up
       if (player.on) { player.vy = -player.jump; player.on = false; }
     }
   }
-  // clear movement keys set by pointer
   keys['ArrowLeft'] = keys['ArrowRight'] = keys['KeyA'] = keys['KeyD'] = false;
   activePointer = null;
   pointerStart = null;
@@ -172,7 +194,6 @@ addEventListener('pointercancel', e => {
 function updatePointerMovement(px, py){
   if (!pointerStart) return;
   const dx = px - pointerStart.x, dy = py - pointerStart.y;
-  // horizontal swipe/drag => move while dragging left/right
   if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > SWIPE_DEADZONE) {
     if (dx < 0) {
       keys['ArrowLeft'] = true; keys['KeyA'] = true;
@@ -182,7 +203,6 @@ function updatePointerMovement(px, py){
       keys['ArrowLeft'] = false; keys['KeyA'] = false;
     }
   } else {
-    // if vertical dominant, don't force horizontal keys
     keys['ArrowLeft'] = keys['ArrowRight'] = keys['KeyA'] = keys['KeyD'] = false;
   }
 }
@@ -193,7 +213,7 @@ const player = {
   vx: 0, vy: 0, on: false,
   jump: 15, acc: 1.2,
   boosting: false,
-  health: 1
+  lives: 3
 };
 const GRAV = 0.9, FRICTION = 0.85;
 
@@ -209,18 +229,40 @@ let boostReady = true, boostUntil = 0, nextBoost = 0;
 let lastShot = 0;
 const SHOT_CD = 180; // ms between shots
 
+/* ====== Powerups & timers ====== */
+let multActive = false, multUntil = 0;
+let shieldActive = false, shieldUntil = 0;
+let invulnerableUntil = 0; // respawn invuln
+
+/* ====== Map themes ====== */
+const THEMES = [
+  { name:'Wüste', bg:['#fb9d4a','#ffebc8'], platform:['#c37d2d','#a04e22'], spike:'#8b2b00', enemy:'#ff6f00', particle:'#ffd9a3', enemyChance:0.28, spikeChance:0.22 },
+  { name:'Schlamm', bg:['#2b3d21','#62734f'], platform:['#4b5f34','#2f3e25'], spike:'#382e1f', enemy:'#b4d455', particle:'#8ea56a', enemyChance:0.34, spikeChance:0.32 },
+  { name:'Wald', bg:['#0b3327','#072816'], platform:['#2e8b57','#0d5b37'], spike:'#16381a', enemy:'#7ce08a', particle:'#8ef0a0', enemyChance:0.30, spikeChance:0.25 },
+  { name:'City', bg:['#1b2030','#0b0f14'], platform:['#7f8b99','#4a5460'], spike:'#2a2a2a', enemy:'#ffd66b', particle:'#cfe6ff', enemyChance:0.40, spikeChance:0.18 },
+  { name:'Night', bg:['#0a1230','#000612'], platform:['#3b3f7a','#1a1f4a'], spike:'#440022', enemy:'#99e0ff', particle:'#b3d7ff', enemyChance:0.25, spikeChance:0.20 }
+];
+let themeIndex = 0;
+let currentTheme = THEMES[0];
+let nextThemeAt = 1200;
+
 /* ====== Init / Restart ====== */
-function restart(){
+function restart(fullReset = true){
   dead = false;
-  dist = 0;
-  speed = 4;
-  tick = 0;
+  if (fullReset) {
+    dist = 0;
+    speed = 4;
+    tick = 0;
+    player.lives = 3;
+    high = +localStorage.getItem(STORE) || 0;
+    highEl.textContent = high;
+  }
   player.x = 140;
   player.y = c.height - 220;
   player.vx = 0;
   player.vy = 0;
   player.boosting = false;
-  player.health = 1;
+  player.on = false;
 
   plats = []; spikes = []; enemies = []; bullets = []; particles = [];
   plats.push({ x: -400, y: c.height - 140, w: 900, h: 18 });
@@ -234,357 +276,17 @@ function restart(){
 
   boostReady = true; player.boosting = false;
   boostEl.textContent = 'READY';
+  multActive = false; multUntil = 0;
+  shieldActive = false; shieldUntil = 0;
+  invulnerableUntil = 0;
+  player.lives = Math.max(1, player.lives);
+  livesEl.textContent = player.lives;
+  multEl.textContent = 'x1';
+  shieldEl.textContent = 'OFF';
   deathEl.style.display = 'none';
+  themeIndex = 0; currentTheme = THEMES[0]; nextThemeAt = 1200;
 }
 restart();
-
-/* ====== Update loop ====== */
-function update(){
-  if (dead) return;
-  tick++; dist += speed;
-  if (tick % 600 === 0) speed = Math.min(10, speed + 0.3);
-
-  // horizontal input (arrow keys OR WASD)
-  if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= player.acc;
-  if (keys['ArrowRight'] || keys['KeyD']) player.vx += player.acc;
-
-  // jump (Space, ArrowUp, W)
-  if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.on){
-    player.vy = -player.jump;
-    player.on = false;
-  }
-
-  // boost
-  const now = performance.now();
-  if (keys['KeyB'] && boostReady){
-    boostReady = false;
-    player.boosting = true;
-    boostUntil = now + BOOST_DUR;
-    nextBoost = now + BOOST_CD;
-    boostEl.textContent = 'BOOSTING';
-  }
-  if (player.boosting){
-    player.vy = -3.6;
-    if (keys['ArrowRight'] || keys['KeyD']) player.vx += 0.6;
-    if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= 0.6;
-    if (now > boostUntil){
-      player.boosting = false;
-      boostEl.textContent = 'COOLDOWN';
-    }
-  } else if (!boostReady && now > nextBoost){
-    boostReady = true;
-    boostEl.textContent = 'READY';
-  }
-
-  // shooting (S): rate-limited. Note: KeyS also used for "tap" on touch; here it's keyboard shoot.
-  if (keys['KeyS'] && now - lastShot > SHOT_CD){
-    bullets.push({
-      x: player.x + player.w,
-      y: player.y + player.h * 0.45,
-      vx: 12,
-      owner: 'player',
-      w: 10, h: 4
-    });
-    lastShot = now;
-  }
-
-  // physics
-  if (!player.boosting) player.vy += GRAV;
-  player.x += player.vx;
-  player.y += player.vy;
-  player.vx *= FRICTION;
-
-  // world scroll: move platforms, spikes, enemies and bullets relative to world
-  for (const o of [...plats, ...spikes, ...enemies, ...bullets, ...particles]) {
-    o.x -= speed;
-  }
-
-  // additionally move bullets by their own vx
-  for (const b of bullets) b.x += b.vx;
-
-  // simple enemy behavior: bob and sometimes shoot toward player
-  for (const e of enemies){
-    e.timer = (e.timer || 0) + 1;
-    e.oy = e.oy || e.y;
-    e.y = e.oy + Math.sin((tick + (e.id||0)*57) * 0.04) * 8;
-    e.shootTimer = e.shootTimer || 0;
-    if (e.x < c.width + 100 && e.x > -50){
-      e.shootTimer--;
-      if (e.shootTimer <= 0){
-        bullets.push({
-          x: e.x,
-          y: e.y + e.h/2,
-          vx: -6,
-          owner: 'enemy',
-          w: 8, h: 4
-        });
-        e.shootTimer = rndInt(60, 180);
-      }
-    }
-  }
-
-  // collisions: player <-> platforms
-  player.on = false;
-  for (const pl of plats){
-    if (player.vy >= 0 &&
-        player.x + player.w > pl.x &&
-        player.x < pl.x + pl.w &&
-        player.y + player.h <= pl.y + 18 &&
-        player.y + player.h + player.vy >= pl.y){
-      player.y = pl.y - player.h;
-      player.vy = 0;
-      player.on = true;
-    }
-  }
-
-  // collisions: player with spikes or enemy bullets or enemies
-  for (const s of spikes){
-    if (rectHit(player, s)) {
-      die('SPIKES');
-      break;
-    }
-  }
-  if (dead) return;
-
-  for (const e of enemies){
-    if (!e.dead && rectHit(player, e)) {
-      // if player is falling onto the enemy (vertical collision from above), bounce and kill enemy
-      if (player.vy > 0 && (player.y + player.h - player.vy) <= e.y + 6) {
-        killEnemy(e, true);
-        player.vy = -player.jump * 0.6; // bounce up
-        player.on = false;
-      } else {
-        die('ENEMY BONK');
-        break;
-      }
-    }
-  }
-  if (dead) return;
-
-  for (const b of bullets){
-    if (b.owner === 'enemy' && rectHit(player, b)){
-      die('SHOT BY ENEMY');
-      break;
-    }
-  }
-  if (dead) return;
-
-  // bullets vs enemies: player bullets kill enemies
-  for (const b of bullets){
-    if (b.owner === 'player'){
-      for (const e of enemies){
-        if (!e.dead && rectHit(b, e)){
-          killEnemy(e, false);
-          b.dead = true;
-          break;
-        }
-      }
-    }
-  }
-
-  // cleanup: remove dead bullets/enemies offscreen
-  bullets = bullets.filter(b => !b.dead && b.x < c.width + 200 && b.x > -400);
-  enemies = enemies.filter(e => {
-    if (e.dead){
-      e.dieTimer--;
-      return e.dieTimer > 0;
-    }
-    return e.x + e.w > -200;
-  });
-
-  // fall out
-  if (player.y > c.height + 120) die('FALL');
-
-  // spawn ahead
-  plats = plats.filter(pl => pl.x + pl.w > -200);
-  spikes = spikes.filter(s => s.x + s.w > -200);
-  while (plats.length < 9 || plats.at(-1).x < c.width + 300){
-    spawnNext();
-  }
-
-  // update particles
-  for (const p of particles){
-    p.x += p.vx; p.y += p.vy; p.life--;
-    p.vx *= 0.98; p.vy += 0.18;
-  }
-  particles = particles.filter(p => p.life > 0);
-
-  // UI
-  scoreEl.textContent = Math.floor(dist);
-}
-
-/* ====== Enemy kill helper ====== */
-function killEnemy(e, bouncePlayer){
-  if (!e || e.dead) return;
-  e.dead = true;
-  e.dieTimer = 30;
-  spawnParticles(e.x + e.w/2, e.y + e.h/2, 14, '#ffd66b');
-  // optional small reward or effect
-  // bounce player lightly if bouncePlayer true or if tap killed
-  if (bouncePlayer) {
-    player.vy = -player.jump * 0.6;
-    player.on = false;
-  }
-}
-
-/* ====== Tap / Click handling ====== */
-function handleTap(clientX, clientY){
-  // convert to canvas coords (same here)
-  const x = clientX, y = clientY;
-  // find topmost enemy under the tap (iterate reverse)
-  for (let i = enemies.length - 1; i >= 0; i--){
-    const e = enemies[i];
-    if (!e.dead && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h){
-      // kill and bounce player upward
-      killEnemy(e, true);
-      return;
-    }
-  }
-  // if not an enemy, consider shooting toward tapped location
-  // spawn a bullet heading roughly right (same behavior as keyboard shoot)
-  bullets.push({
-    x: player.x + player.w,
-    y: player.y + player.h * 0.45,
-    vx: 12,
-    owner: 'player',
-    w: 10, h: 4
-  });
-  lastShot = performance.now();
-}
-
-/* ====== Spawn logic (guaranteed doable) ====== */
-function spawnNext(){
-  const last = plats.at(-1);
-  const gap = rndInt(140, 320);
-  let y = last.y + rndInt(-120, 160);
-  y = clamp(y, 80, c.height - 90);
-  const w = rndInt(90, 220);
-  const x = last.x + last.w + gap;
-  plats.push({ x, y, w, h: 18 });
-
-  if (Math.random() < 0.28){
-    spikes.push({ x: x - rndInt(40, Math.max(60, gap - 20)), y: c.height - 44, w: 30, h: 30 });
-  }
-
-  if (Math.random() < 0.32){
-    const ex = x + rndInt(40, Math.max(40, w - 40));
-    const ey = y - 30;
-    enemies.push({
-      x: ex,
-      y: ey,
-      w: 28,
-      h: 28,
-      id: Math.floor(Math.random() * 10000),
-      shootTimer: rndInt(90, 220),
-      dead: false
-    });
-  }
-}
-
-/* ====== Drawing ====== */
-function draw(){
-  // background gradient
-  const g = ctx.createLinearGradient(0,0,0,c.height);
-  g.addColorStop(0, '#0c1530');
-  g.addColorStop(1, '#02030a');
-  ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height);
-
-  // subtle parallax lines
-  ctx.fillStyle = 'rgba(255,255,255,0.03)';
-  for (let i=0;i<60;i++){
-    ctx.fillRect((tick*0.18 + i*200) % c.width, i * 30, 80, 2);
-  }
-
-  // draw platforms
-  for (const pl of plats){
-    ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 14;
-    const pg = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y + pl.h);
-    pg.addColorStop(0, '#6a74ff'); pg.addColorStop(1, '#3a40d6');
-    ctx.fillStyle = pg;
-    roundRect(ctx, pl.x, pl.y, pl.w, pl.h, 8, true, false);
-    ctx.shadowBlur = 0;
-  }
-
-  // spikes
-  for (const s of spikes){
-    ctx.fillStyle = '#ff4d4d';
-    triangle(ctx, s.x, s.y, s.w, s.h);
-    ctx.fillStyle = '#420';
-    ctx.fillRect(s.x, s.y + s.h - 6, s.w, 6);
-  }
-
-  // enemies (alive or dying)
-  for (const e of enemies){
-    if (!e.dead){
-      ctx.fillStyle = '#ffcc33';
-      roundRect(ctx, e.x, e.y, e.w, e.h, 6, true, false);
-      ctx.fillStyle = '#2b1b00';
-      ctx.fillRect(e.x + 6, e.y + 8, 4, 6);
-      ctx.fillRect(e.x + e.w - 10, e.y + 8, 4, 6);
-    } else {
-      const t = e.dieTimer / 30;
-      ctx.globalAlpha = t;
-      ctx.fillStyle = '#ffb93b';
-      roundRect(ctx, e.x + (1-t)*8, e.y + (1-t)*6, e.w * t, e.h * t, 6, true, false);
-      ctx.globalAlpha = 1;
-    }
-  }
-
-  // bullets
-  for (const b of bullets){
-    if (b.owner === 'player'){
-      ctx.fillStyle = '#66ffff';
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-      ctx.globalAlpha = 0.15;
-      ctx.fillRect(b.x - 6, b.y - 2, b.w + 12, b.h + 4);
-      ctx.globalAlpha = 1;
-    } else {
-      ctx.fillStyle = '#ff8b8b';
-      ctx.fillRect(b.x, b.y, b.w, b.h);
-    }
-  }
-
-  // particles
-  for (const p of particles){
-    ctx.globalAlpha = p.life / p.maxLife;
-    ctx.fillStyle = p.color;
-    ctx.fillRect(p.x, p.y, p.size, p.size);
-    ctx.globalAlpha = 1;
-  }
-
-  // player with face & boost aura
-  ctx.save();
-  ctx.translate(player.x + player.w/2, player.y + player.h/2);
-  if (player.boosting){
-    ctx.fillStyle = 'rgba(102,255,255,0.08)';
-    ctx.beginPath();
-    ctx.ellipse(0, 6, player.w + 18, player.h + 26, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  ctx.fillStyle = player.boosting ? '#66ffff' : '#66ff99';
-  roundRect(ctx, -player.w/2, -player.h/2, player.w, player.h, 8, true, false);
-  ctx.fillStyle = '#000';
-  ctx.fillRect(-6, -6, 4, 6);
-  ctx.fillRect(4, -6, 4, 6);
-  ctx.fillRect(-6, 8, 12, 3);
-  ctx.restore();
-}
-
-/* ====== Death ====== */
-function die(reason){
-  if (dead) return;
-  dead = true;
-  const d = Math.floor(dist);
-  if (d > high){
-    high = d;
-    localStorage.setItem(STORE, high);
-    highEl.textContent = high;
-  }
-  deathText.textContent = reason;
-  deathSub.textContent = `Distance ${d} · High ${high}`;
-  deathEl.style.display = 'flex';
-  setTimeout(()=>{ restart(); }, 900);
-}
 
 /* ====== Utilities ====== */
 function rnd(min, max){ return Math.random() * (max - min) + min; }
@@ -631,6 +333,452 @@ function spawnParticles(x,y,count,color){
     });
   }
 }
+function showMsg(text, time = 900){
+  msgEl.textContent = text;
+  msgEl.style.display = 'block';
+  clearTimeout(msgEl._t);
+  msgEl._t = setTimeout(()=> msgEl.style.display = 'none', time);
+}
+
+/* ====== Spawn logic (theme-aware) ====== */
+function spawnNext(){
+  const last = plats.at(-1);
+  const gap = rndInt(140, 320);
+  let y = last.y + rndInt(-120, 160);
+  y = clamp(y, 80, c.height - 90);
+  const w = rndInt(90, 220);
+  const x = last.x + last.w + gap;
+  plats.push({ x, y, w, h: 18 });
+
+  // theme-based spikes/enemy chances
+  if (Math.random() < (currentTheme.spikeChance || 0.28)){
+    spikes.push({ x: x - rndInt(40, Math.max(60, gap - 20)), y: c.height - 44, w: 30, h: 30 });
+  }
+
+  if (Math.random() < (currentTheme.enemyChance || 0.32)){
+    const ex = x + rndInt(40, Math.max(40, w - 40));
+    const ey = y - 30;
+    enemies.push({
+      x: ex,
+      y: ey,
+      w: 28,
+      h: 28,
+      id: Math.floor(Math.random() * 10000),
+      shootTimer: rndInt(90, 220),
+      dead: false
+    });
+  }
+}
+
+/* ====== Enemy kill helper ====== */
+function killEnemy(e, bouncePlayer){
+  if (!e || e.dead) return;
+  e.dead = true;
+  e.dieTimer = 30;
+  spawnParticles(e.x + e.w/2, e.y + e.h/2, 18, currentTheme.particle || '#ffd66b');
+
+  // grant rewards: multiplier + shield
+  const now = performance.now();
+  multActive = true;
+  multUntil = now + 10000; // 10s
+  shieldActive = true;
+  shieldUntil = now + 3000; // 3s
+  showMsg(`${currentTheme.name} — x2 & SCHIRM!`, 1400);
+
+  // small score/visuals
+  if (bouncePlayer) {
+    player.vy = -player.jump * 0.6;
+    player.on = false;
+  }
+}
+
+/* ====== Tap / Click handling ====== */
+function handleTap(clientX, clientY){
+  const x = clientX, y = clientY;
+  for (let i = enemies.length - 1; i >= 0; i--){
+    const e = enemies[i];
+    if (!e.dead && x >= e.x && x <= e.x + e.w && y >= e.y && y <= e.y + e.h){
+      killEnemy(e, true);
+      return;
+    }
+  }
+  bullets.push({
+    x: player.x + player.w,
+    y: player.y + player.h * 0.45,
+    vx: 12,
+    owner: 'player',
+    w: 10, h: 4
+  });
+  lastShot = performance.now();
+}
+
+/* ====== Death / life handling ====== */
+function loseLife(reason){
+  const now = performance.now();
+  // if shield or invulnerable, ignore
+  if ((shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil)) {
+    // soft feedback
+    showMsg('Unberührbar', 800);
+    return;
+  }
+  player.lives--;
+  livesEl.textContent = player.lives;
+  spawnParticles(player.x + player.w/2, player.y + player.h/2, 26, '#ff6b6b');
+
+  if (player.lives > 0){
+    showMsg(`Leben verloren · verbleibend: ${player.lives}`, 1000);
+    // brief respawn: reset position & short invuln
+    player.x = 140;
+    player.y = c.height - 220;
+    player.vx = 0; player.vy = 0;
+    invulnerableUntil = performance.now() + 1200; // 1.2s
+    shieldActive = true; shieldUntil = performance.now() + 1200; // show shield during invuln
+    return;
+  }
+
+  // final death
+  finalDeath(reason);
+}
+
+function finalDeath(reason){
+  if (dead) return;
+  dead = true;
+  const d = Math.floor(dist);
+  if (d > high){
+    high = d;
+    localStorage.setItem(STORE, high);
+    highEl.textContent = high;
+  }
+  deathText.textContent = reason;
+  deathSub.textContent = `Distance ${d} · High ${high}`;
+  deathEl.style.display = 'flex';
+  setTimeout(()=>{ restart(true); }, 900);
+}
+
+/* ====== Update loop ====== */
+function update(){
+  if (dead) return;
+  tick++;
+
+  // update theme based on distance
+  if (dist > nextThemeAt){
+    themeIndex = (themeIndex + 1) % THEMES.length;
+    currentTheme = THEMES[themeIndex];
+    nextThemeAt += 1200 + rndInt(0, 600);
+    showMsg(`Map: ${currentTheme.name}`, 1200);
+  }
+
+  // distance increment uses multiplier
+  const now = performance.now();
+  const multFactor = multActive && now < multUntil ? 2 : 1;
+  if (multActive && now >= multUntil) multActive = false;
+  if (shieldActive && now >= shieldUntil) shieldActive = false;
+
+  dist += speed * multFactor;
+  tick += 0; // keep tick for animation
+  if (tick % 600 === 0) speed = Math.min(12, speed + 0.25);
+
+  // horizontal input (arrow keys OR WASD)
+  if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= player.acc;
+  if (keys['ArrowRight'] || keys['KeyD']) player.vx += player.acc;
+
+  // jump (Space, ArrowUp, W)
+  if ((keys['Space'] || keys['ArrowUp'] || keys['KeyW']) && player.on){
+    player.vy = -player.jump;
+    player.on = false;
+  }
+
+  // boost
+  if (keys['KeyB'] && boostReady){
+    boostReady = false;
+    player.boosting = true;
+    boostUntil = now + BOOST_DUR;
+    nextBoost = now + BOOST_CD;
+    boostEl.textContent = 'BOOSTING';
+  }
+  if (player.boosting){
+    player.vy = -3.6;
+    if (keys['ArrowRight'] || keys['KeyD']) player.vx += 0.6;
+    if (keys['ArrowLeft'] || keys['KeyA']) player.vx -= 0.6;
+    if (now > boostUntil){
+      player.boosting = false;
+      boostEl.textContent = 'COOLDOWN';
+    }
+  } else if (!boostReady && now > nextBoost){
+    boostReady = true;
+    boostEl.textContent = 'READY';
+  }
+
+  // shooting (S)
+  if (keys['KeyS'] && now - lastShot > SHOT_CD){
+    bullets.push({
+      x: player.x + player.w,
+      y: player.y + player.h * 0.45,
+      vx: 12,
+      owner: 'player',
+      w: 10, h: 4
+    });
+    lastShot = now;
+  }
+
+  // physics
+  if (!player.boosting) player.vy += GRAV;
+  player.x += player.vx;
+  player.y += player.vy;
+  player.vx *= FRICTION;
+
+  // world scroll: move platforms, spikes, enemies and bullets relative to world
+  for (const o of [...plats, ...spikes, ...enemies, ...bullets, ...particles]) {
+    o.x -= speed;
+  }
+
+  // additionally move bullets by their own vx
+  for (const b of bullets) b.x += b.vx;
+
+  // simple enemy behavior: bob and sometimes shoot toward player
+  for (const e of enemies){
+    e.timer = (e.timer || 0) + 1;
+    e.oy = e.oy || e.y;
+    e.y = e.oy + Math.sin((tick + (e.id||0)*57) * 0.04) * 8;
+    e.shootTimer = e.shootTimer || 0;
+    if (e.x < c.width + 100 && e.x > -50){
+      e.shootTimer--;
+      if (e.shootTimer <= 0){
+        bullets.push({
+          x: e.x,
+          y: e.y + e.h/2,
+          vx: -6,
+          owner: 'enemy',
+          w: 8, h: 4
+        });
+        e.shootTimer = rndInt(70, 200);
+      }
+    }
+  }
+
+  // collisions: player <-> platforms
+  player.on = false;
+  for (const pl of plats){
+    if (player.vy >= 0 &&
+        player.x + player.w > pl.x &&
+        player.x < pl.x + pl.w &&
+        player.y + player.h <= pl.y + 18 &&
+        player.y + player.h + player.vy >= pl.y){
+      player.y = pl.y - player.h;
+      player.vy = 0;
+      player.on = true;
+    }
+  }
+
+  // collisions: player with spikes or enemy bullets or enemies
+  for (const s of spikes){
+    if (rectHit(player, s)) {
+      loseLife('SPIKES');
+      break;
+    }
+  }
+  if (dead) return;
+
+  for (const e of enemies){
+    if (!e.dead && rectHit(player, e)) {
+      if (player.vy > 0 && (player.y + player.h - player.vy) <= e.y + 6) {
+        killEnemy(e, true);
+        player.vy = -player.jump * 0.6; // bounce up
+        player.on = false;
+      } else {
+        loseLife('ENEMY BONK');
+        break;
+      }
+    }
+  }
+  if (dead) return;
+
+  for (const b of bullets){
+    if (b.owner === 'enemy' && rectHit(player, b)){
+      // respect shield/invuln
+      if ((shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil)) {
+        // ignore
+      } else {
+        loseLife('SHOT BY ENEMY');
+        break;
+      }
+    }
+  }
+  if (dead) return;
+
+  // bullets vs enemies: player bullets kill enemies
+  for (const b of bullets){
+    if (b.owner === 'player'){
+      for (const e of enemies){
+        if (!e.dead && rectHit(b, e)){
+          killEnemy(e, false);
+          b.dead = true;
+          break;
+        }
+      }
+    }
+  }
+
+  // cleanup: remove dead bullets/enemies offscreen
+  bullets = bullets.filter(b => !b.dead && b.x < c.width + 200 && b.x > -400);
+  enemies = enemies.filter(e => {
+    if (e.dead){
+      e.dieTimer--;
+      return e.dieTimer > 0;
+    }
+    return e.x + e.w > -200;
+  });
+
+  // fall out
+  if (player.y > c.height + 120) {
+    loseLife('FALL');
+  }
+
+  // spawn ahead
+  plats = plats.filter(pl => pl.x + pl.w > -200);
+  spikes = spikes.filter(s => s.x + s.w > -200);
+  while (plats.length < 9 || plats.at(-1).x < c.width + 300){
+    spawnNext();
+  }
+
+  // update particles
+  for (const p of particles){
+    p.x += p.vx; p.y += p.vy; p.life--;
+    p.vx *= 0.98; p.vy += 0.18;
+  }
+  particles = particles.filter(p => p.life > 0);
+
+  // UI updates
+  scoreEl.textContent = Math.floor(dist);
+  livesEl.textContent = player.lives;
+  multEl.textContent = (multActive && now < multUntil) ? 'x2' : 'x1';
+  if (shieldActive && now < shieldUntil) {
+    shieldEl.textContent = `${((shieldUntil - now)/1000).toFixed(1)}s`;
+  } else {
+    shieldEl.textContent = 'OFF';
+  }
+}
+
+/* ====== Drawing ====== */
+function draw(){
+  // background gradient by theme
+  const g = ctx.createLinearGradient(0,0,0,c.height);
+  g.addColorStop(0, currentTheme.bg[0]);
+  g.addColorStop(1, currentTheme.bg[1]);
+  ctx.fillStyle = g; ctx.fillRect(0,0,c.width,c.height);
+
+  // parallax decor lines / dust / city lights for themes
+  if (currentTheme.name === 'Night'){
+    // subtle stars
+    for (let i=0;i<80;i++){
+      const sx = (i * 123 + tick*0.15) % c.width;
+      ctx.globalAlpha = 0.06 + (Math.sin((tick+i)*0.02)*0.02);
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(sx, (i*17)%c.height, 2, 2);
+    }
+    ctx.globalAlpha = 1;
+  } else {
+    ctx.fillStyle = 'rgba(255,255,255,0.03)';
+    for (let i=0;i<60;i++){
+      ctx.fillRect((tick*0.18 + i*200) % c.width, i * 30, 80, 2);
+    }
+  }
+
+  // draw platforms
+  for (const pl of plats){
+    ctx.shadowColor = 'rgba(0,0,0,0.5)'; ctx.shadowBlur = 10;
+    const pg = ctx.createLinearGradient(pl.x, pl.y, pl.x, pl.y + pl.h);
+    pg.addColorStop(0, currentTheme.platform[0]); pg.addColorStop(1, currentTheme.platform[1]);
+    ctx.fillStyle = pg;
+    roundRect(ctx, pl.x, pl.y, pl.w, pl.h, 8, true, false);
+    ctx.shadowBlur = 0;
+  }
+
+  // spikes
+  for (const s of spikes){
+    ctx.fillStyle = currentTheme.spike || '#ff4d4d';
+    triangle(ctx, s.x, s.y, s.w, s.h);
+    ctx.fillStyle = '#420';
+    ctx.fillRect(s.x, s.y + s.h - 6, s.w, 6);
+  }
+
+  // enemies (alive or dying)
+  for (const e of enemies){
+    if (!e.dead){
+      ctx.fillStyle = currentTheme.enemy || '#ffcc33';
+      roundRect(ctx, e.x, e.y, e.w, e.h, 6, true, false);
+      ctx.fillStyle = '#2b1b00';
+      ctx.fillRect(e.x + 6, e.y + 8, 4, 6);
+      ctx.fillRect(e.x + e.w - 10, e.y + 8, 4, 6);
+    } else {
+      const t = e.dieTimer / 30;
+      ctx.globalAlpha = t;
+      ctx.fillStyle = currentTheme.particle || '#ffb93b';
+      roundRect(ctx, e.x + (1-t)*8, e.y + (1-t)*6, e.w * t, e.h * t, 6, true, false);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // bullets
+  for (const b of bullets){
+    if (b.owner === 'player'){
+      ctx.fillStyle = '#66ffff';
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+      ctx.globalAlpha = 0.15;
+      ctx.fillRect(b.x - 6, b.y - 2, b.w + 12, b.h + 4);
+      ctx.globalAlpha = 1;
+    } else {
+      ctx.fillStyle = '#ff8b8b';
+      ctx.fillRect(b.x, b.y, b.w, b.h);
+    }
+  }
+
+  // particles
+  for (const p of particles){
+    ctx.globalAlpha = p.life / p.maxLife;
+    ctx.fillStyle = p.color;
+    ctx.fillRect(p.x, p.y, p.size, p.size);
+    ctx.globalAlpha = 1;
+  }
+
+  // player aura for boost
+  ctx.save();
+  ctx.translate(player.x + player.w/2, player.y + player.h/2);
+  if (player.boosting){
+    ctx.fillStyle = 'rgba(102,255,255,0.08)';
+    ctx.beginPath();
+    ctx.ellipse(0, 6, player.w + 18, player.h + 26, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  // shield visual (pulsing)
+  const now = performance.now();
+  const isShield = (shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil);
+  if (isShield){
+    const remain = Math.max(0, (Math.min(shieldUntil || 0, invulnerableUntil || 0) - now));
+    ctx.globalAlpha = 0.35 + 0.15 * Math.sin(now * 0.02);
+    ctx.beginPath();
+    ctx.ellipse(0, 6, player.w + 20, player.h + 36, 0, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(180,230,255,0.18)';
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  ctx.fillStyle = player.boosting ? '#66ffff' : '#66ff99';
+  roundRect(ctx, -player.w/2, -player.h/2, player.w, player.h, 8, true, false);
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-6, -6, 4, 6);
+  ctx.fillRect(4, -6, 4, 6);
+  ctx.fillRect(-6, 8, 12, 3);
+  ctx.restore();
+
+  // small HUD map name
+  ctx.fillStyle = 'rgba(255,255,255,0.03)';
+  ctx.fillRect(c.width - 170, 12, 156, 30);
+  ctx.fillStyle = 'rgba(255,255,255,0.9)';
+  ctx.font = '13px system-ui';
+  ctx.fillText(`${currentTheme.name}`, c.width - 158, 33);
+}
 
 /* ====== Mouse click fallback (desktop) ====== */
 addEventListener('click', e => {
@@ -638,6 +786,7 @@ addEventListener('click', e => {
 });
 
 /* ====== Main loop ====== */
+let lastFrame = performance.now();
 function loop(){
   update();
   ctx.clearRect(0,0,c.width,c.height);
@@ -646,5 +795,6 @@ function loop(){
 }
 requestAnimationFrame(loop);
 </script>
+
 </body>
 </html>
