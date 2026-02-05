@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<title>Funny Infinite Jump & Run — Single File</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<style>
+  :root { --bg:#0b0b12; --panel:#101216; --accent:#9fe66b; --muted:#999; }
+  html,body{height:100%;margin:0;background:linear-gradient(#061017,#000);font-family:Inter,ui-sans-serif,system-ui,monospace;color:#ddd;overflow:hidden}
+  canvas{display:block;width:100%;height:100%}
+  #ui{position:fixed;left:14px;top:12px;z-index:20;pointer-events:none;line-height:1.3}
+  #ui .row{background:rgba(0,0,0,0.35);padding:6px 10px;border-radius:8px;margin-bottom:8px;font-size:14px}
+  #death{position:fixed;inset:0;display:none;align-items:center;justify-content:center;background:linear-gradient(rgba(0,0,0,0.85),rgba(0,0,0,0.95));z-index:30;flex-direction:column}
+  #death .box{background:var(--panel);padding:24px;border-radius:12px;min-width:300px;text-align:center}
+  button{background:var(--accent);border:0;padding:10px 16px;border-radius:8px;font-weight:700;cursor:pointer}
+  .small{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+
+<canvas id="c"></canvas>
+
+<div id="ui">
+  <div class="row" id="scoreRow">
+    Distance: <span id="score">0</span>
+    &nbsp; • &nbsp; Highscore: <span id="high">0</span>
+    &nbsp; • &nbsp; Auto-Restart: <span id="auto">ON</span>
+  </div>
+  <div class="row small" id="hint">Controls: ← → to move, ↑ or Space to jump, R to restart</div>
+  <div class="row small" id="msg">Have fun. This is guaranteed doable.</div>
+</div>
+
+<div id="death">
+  <div class="box">
+    <div id="deathText" style="font-size:18px;margin-bottom:12px"></div>
+    <div class="small" id="deathSub" style="margin-bottom:14px"></div>
+    <div>
+      <button id="btnRestart">Restart</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* Single-file infinite jump-and-run
+   - R restarts immediately
+   - Auto-restart enabled (restarts 1s after death)
+   - Always-doable procedural generation (gaps and heights within player's reach)
+   - ArrowUp + Space both jump
+   - Persistent highscore via localStorage
+*/
+
+/* ---------- Canvas ---------- */
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d', { alpha: false });
+function resize(){ canvas.width = innerWidth; canvas.height = innerHeight; }
+addEventListener('resize', resize);
+resize();
+
+/* ---------- Game constants & state ---------- */
+const GRAV = 0.9;
+const FRICTION = 0.85;
+const STORAGE_KEY = 'jumpy_highscore_v1';
+
+let highscore = Number(localStorage.getItem(STORAGE_KEY) || 0);
+document.getElementById('high').textContent = highscore;
+
+let autoRestart = true;
+document.getElementById('auto').textContent = autoRestart ? 'ON' : 'OFF';
+
+let dead = false;
+let autoRestartTimer = null;
+
+/* Player physical capabilities (used to guarantee reachability) */
+const player = {
+  x: 140,
+  y: 0,
+  w: 34,
+  h: 44,
+  vx: 0,
+  vy: 0,
+  accel: 1.2,      // per frame horizontal control
+  jumpPower: 15,   // initial upward velocity
+  onGround: false
+};
+
+/* Derived reachability */
+function maxAirtime(jumpPower = player.jumpPower, g = GRAV){
+  // time until returning to same vertical level (frames)
+  return Math.max(0, -2 * jumpPower / g);
+}
+function maxJumpHeight(jumpPower = player.jumpPower, g = GRAV){
+  return (jumpPower * jumpPower) / (2 * g);
+}
+const MAX_AIR = maxAirtime();
+const MAX_JUMP_H = maxJumpHeight();
+
+/* World */
+let platforms = [];
+let spikes = [];
+let distance = 0;
+let worldSpeed = 4; // base scrolling speed
+let tick = 0;
+
+/* UI refs */
+const scoreEl = document.getElementById('score');
+const msgEl = document.getElementById('msg');
+const deathEl = document.getElementById('death');
+const deathText = document.getElementById('deathText');
+const deathSub = document.getElementById('deathSub');
+const btnRestart = document.getElementById('btnRestart');
+btnRestart.onclick = restartImmediate;
+
+/* Input */
+const keys = {};
+addEventListener('keydown', (e)=> {
+  keys[e.code] = true;
+
+  // R = restart (works anytime)
+  if(e.code === 'KeyR') {
+    restartImmediate();
+  }
+
+  // toggle auto-restart with T (handy for debugging)
+  if(e.code === 'KeyT') {
+    autoRestart = !autoRestart;
+    document.getElementById('auto').textContent = autoRestart ? 'ON' : 'OFF';
+  }
+});
+addEventListener('keyup', (e)=> keys[e.code] = false);
+
+/* Make Space and ArrowUp both jump */
+function isJumpPressed(){
+  return keys['Space'] || keys['ArrowUp'];
+}
+
+/* ---------- Procedural, always-doable generation ---------- */
+/* We'll ensure the gap (horizontal distance from last platform end to next platform start)
+   never exceeds the maximum horizontal reach a player can manage while airborne.
+   Horizontal reach estimate: playerCanReach = (player.maxHorizontalSpeed + worldSpeed) * airtime
+   but to avoid complex math and to be robust across playstyles, we cap gap to a safe constant
+   derived from typical play: 380 px. We also limit vertical differences to within MAX_JUMP_H + margin.
+*/
+
+function spawnInitialPlatforms(){
+  platforms = [];
+  spikes = [];
+  const startY = canvas.height - 140;
+  // initial ground platform that spans left area
+  platforms.push({ x: -500, y: startY, w: 1000, h: 18 });
+  // then a few platforms forward
+  let curX = 120;
+  let curY = startY;
+  for(let i=0;i<8;i++){
+    const w = randInt(100, 220);
+    platforms.push({ x: curX, y: curY - randInt(-20, 40), w, h: 18 });
+    curX += w + randInt(120, 260);
+    // small variation but keep next y reachable
+    curY = clamp(platforms[platforms.length-1].y, 80, canvas.height - 80);
+  }
+}
+
+function spawnNextPlatform(afterX){
+  // decide gap based on difficulty and worldSpeed
+  const baseGap = clamp(100 + worldSpeed * 8, 100, 300); // increases slightly with speed
+  const gap = randInt(baseGap - 40, baseGap + 60);
+  const last = platforms[platforms.length - 1];
+  // vertical: keep within reachable zone relative to last.y
+  // allow going up by at most (MAX_JUMP_H - margin) and down similar
+  const maxUp = Math.max(- (MAX_JUMP_H - 30), -120); // negative is upwards
+  const maxDown = 160;
+  let newY = last ? last.y + randInt(maxUp, maxDown) : canvas.height - 150;
+  newY = clamp(newY, 80, canvas.height - 80);
+  const w = randInt(80, 220);
+  const x = (last ? last.x + last.w : afterX) + gap;
+  platforms.push({ x, y: newY, w, h: 18 });
+
+  // sometimes place a spike on ground just before the platform (not on top)
+  if(Math.random() < 0.28){
+    const sx = x - randInt(40, 140);
+    spikes.push({ x: sx, y: canvas.height - 44, w: 32, h: 32 });
+  }
+}
+
+/* ---------- Utils ---------- */
+function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b,v)); }
+function rects(a,b){ return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y; }
+
+/* ---------- Initialize ---------- */
+function init(){
+  dead = false;
+  distance = 0;
+  worldSpeed = 4;
+  tick = 0;
+  player.x = 140;
+  player.y = canvas.height - 200;
+  player.vx = 0;
+  player.vy = 0;
+  player.onGround = false;
+  spawnInitialPlatforms();
+  document.getElementById('msg').textContent = "Guaranteed doable. Good luck!";
+  document.getElementById('death').style.display = 'none';
+  if(autoRestartTimer){ clearTimeout(autoRestartTimer); autoRestartTimer = null; }
+}
+init();
+
+/* ---------- Game update & loop ---------- */
+function update(){
+  if(dead) return;
+
+  tick++;
+  distance += worldSpeed;
+  // slowly increase difficulty
+  if(tick % 600 === 0) worldSpeed = Math.min(10, worldSpeed + 0.25);
+
+  // input horizontal
+  if(keys['ArrowLeft']) player.vx -= player.accel;
+  if(keys['ArrowRight']) player.vx += player.accel;
+
+  // jump (space or up) only when on ground
+  if(isJumpPressed() && player.onGround){
+    player.vy = -player.jumpPower;
+    player.onGround = false;
+  }
+
+  // physics
+  player.vy += GRAV;
+  player.x += player.vx;
+  player.y += player.vy;
+  player.vx *= FRICTION;
+
+  // world scrolling effect: move platforms/spikes left by worldSpeed
+  for(const p of platforms) p.x -= worldSpeed;
+  for(const s of spikes) s.x -= worldSpeed;
+
+  // collision with platforms (simple stable landing)
+  player.onGround = false;
+  for(const p of platforms){
+    // only check if above platform and falling
+    if(player.vy >= 0 &&
+       player.x + player.w > p.x && player.x < p.x + p.w &&
+       player.y + player.h <= p.y + 18 && player.y + player.h + player.vy >= p.y){
+      player.y = p.y - player.h;
+      player.vy = 0;
+      player.onGround = true;
+    }
+  }
+
+  // fall below bottom
+  if(player.y > canvas.height + 100){
+    die("YOU FELL");
+  }
+
+  // spikes collision
+  for(const s of spikes){
+    if(rects(player, s)){
+      die("YOU HIT SPIKES");
+    }
+  }
+
+  // Remove offscreen
+  platforms = platforms.filter(p => p.x + p.w > -200);
+  spikes = spikes.filter(s => s.x + s.w > -200);
+
+  // Spawn new platforms to keep enough ahead
+  while(platforms.length < 9 || (platforms[platforms.length-1].x < canvas.width + 300)){
+    spawnNextPlatform();
+  }
+
+  // update UI
+  scoreEl.textContent = Math.floor(distance);
+
+  // occasional funny message
+  if(tick % 360 === 0){
+    const msgs = [
+      "Das wird lustig.",
+      "Vorsicht: trolle platform.",
+      "Halt dich fest.",
+      "Noch 'ne Lücke? Klar.",
+      "Du schaffst das — wirklich!"
+    ];
+    msgEl.textContent = msgs[randInt(0,msgs.length-1)];
+  }
+}
+
+/* ---------- Death & Restart ---------- */
+function die(reason){
+  if(dead) return;
+  dead = true;
+  // update highscore
+  const d = Math.floor(distance);
+  if(d > highscore){
+    highscore = d;
+    localStorage.setItem(STORAGE_KEY, highscore);
+    document.getElementById('high').textContent = highscore;
+  }
+
+  // show death UI
+  deathText.textContent = reason;
+  deathSub.textContent = `Distance: ${d}  •  Highscore: ${highscore}`;
+  document.getElementById('death').style.display = 'flex';
+
+  // auto restart if enabled
+  if(autoRestart){
+    let delay = 1000;
+    let countdown = delay;
+    const start = performance.now();
+    autoRestartTimer = setTimeout(()=> {
+      restartImmediate();
+    }, delay);
+    // optional small visual countdown on button text
+    const orig = btnRestart.textContent;
+    let rafId;
+    function tickCount(now){
+      const remaining = Math.max(0, Math.round((delay - (now - start))/1000 * 10)/10);
+      btnRestart.textContent = `Restarting in ${remaining.toFixed(1)}s — press R to skip`;
+      if(!dead) return; // stop if restarted manually
+      rafId = requestAnimationFrame(tickCount);
+    }
+    rafId = requestAnimationFrame(tickCount);
+    // clear RAF when restart occurs
+    const clear = ()=>{ cancelAnimationFrame(rafId); btnRestart.textContent = "Restart"; };
+    btnRestart.addEventListener('click', clear, { once: true });
+  }
+}
+
+// restart without full page reload
+function restartImmediate(){
+  if(autoRestartTimer){ clearTimeout(autoRestartTimer); autoRestartTimer = null; }
+  document.getElementById('death').style.display = 'none';
+  init();
+}
+
+/* ---------- Draw ---------- */
+function draw(){
+  // background
+  ctx.fillStyle = '#061017';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  // parallax sky (silly)
+  for(let i=0;i<6;i++){
+    ctx.fillStyle = `rgba(255,255,255,${0.02 + i*0.01})`;
+    const y = 40 + (i*18) + ((tick*0.2 * (i+1)) % 40);
+    ctx.fillRect(0, y, canvas.width, 2);
+  }
+
+  // ground decorative
+  ctx.fillStyle = '#0b0d10';
+  ctx.fillRect(0, canvas.height - 48, canvas.width, 48);
+
+  // platforms
+  for(const p of platforms){
+    // platform shadow
+    ctx.fillStyle = '#020203';
+    ctx.fillRect(p.x+3, p.y+6, p.w, p.h);
+    // main
+    ctx.fillStyle = '#444';
+    roundRect(ctx, p.x, p.y, p.w, p.h, 6, true, false);
+    // occasional silly sticker
+    if(((p.x|0) % 300) < 6){
+      ctx.fillStyle = '#9fe66b';
+      ctx.fillRect(p.x + 6, p.y - 12, 8, 8);
+    }
+  }
+
+  // spikes
+  for(const s of spikes){
+    ctx.beginPath();
+    ctx.moveTo(s.x, s.y + s.h);
+    ctx.lineTo(s.x + s.w/2, s.y);
+    ctx.lineTo(s.x + s.w, s.y + s.h);
+    ctx.closePath();
+    ctx.fillStyle = '#d33';
+    ctx.fill();
+    ctx.fillStyle = '#420';
+    ctx.fillRect(s.x, s.y + s.h - 6, s.w, 6);
+  }
+
+  // player (draw with face)
+  ctx.save();
+  ctx.translate(player.x + player.w/2, player.y + player.h/2);
+  // body
+  ctx.fillStyle = '#7cf37d';
+  roundRect(ctx, -player.w/2, -player.h/2, player.w, player.h, 6, true, false);
+  // eyes
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-6, -6, 4, 6);
+  ctx.fillRect(4, -6, 4, 6);
+  // mouth
+  ctx.fillStyle = '#000';
+  ctx.fillRect(-6, 8, 12, 3);
+  ctx.restore();
+
+  // HUD handled by DOM
+}
+
+// helper draw rounded rect
+function roundRect(ctx,x,y,w,h,r,fill,stroke){
+  if(typeof r==='number'){ r = {tl:r,tr:r,br:r,bl:r}; }
+  ctx.beginPath();
+  ctx.moveTo(x + r.tl, y);
+  ctx.lineTo(x + w - r.tr, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r.tr);
+  ctx.lineTo(x + w, y + h - r.br);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r.br, y + h);
+  ctx.lineTo(x + r.bl, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r.bl);
+  ctx.lineTo(x, y + r.tl);
+  ctx.quadraticCurveTo(x, y, x + r.tl, y);
+  ctx.closePath();
+  if(fill) ctx.fill();
+  if(stroke) ctx.stroke();
+}
+
+/* ---------- Main loop ---------- */
+function loop(){
+  update();
+  draw();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+/* ---------- Utility: clamp spawn based on last platform ---------- */
+function spawnNextPlatform(){
+  const last = platforms[platforms.length - 1];
+  const lastRight = last.x + last.w;
+  // compute a safe gap and vertical range
+  const safeMaxGap = clamp(340 + Math.floor(worldSpeed * 10), 180, 420);
+  const gap = randInt(Math.max(90, safeMaxGap - 120), safeMaxGap);
+  // vertical change limited to what player can reach
+  const upLimit = Math.max(-Math.floor(MAX_JUMP_H - 20), -140); // how much y can go up
+  const downLimit = 160;
+  let newY = last.y + randInt(upLimit, downLimit);
+  newY = clamp(newY, 70, canvas.height - 90);
+  const w = randInt(90, 220);
+  const x = lastRight + gap;
+  platforms.push({ x, y: newY, w, h: 18 });
+
+  // spikes spawn but not on tiny chokepoints directly where platform starts
+  if(Math.random() < 0.28){
+    const sx = x - randInt(40, Math.max(60, gap - 20));
+    spikes.push({ x: sx, y: canvas.height - 44, w: 32, h: 32 });
+  }
+}
+
+/* ---------- Small helpers ---------- */
+function randInt(a,b){ return Math.floor(Math.random()*(b-a+1))+a; }
+function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
+
+/* override to ensure consistent functions (due to earlier definitions) */
+window.spawnNextPlatform = spawnNextPlatform;
+
+/* ---------- End of file ---------- */
+</script>
+</body>
+</html>
