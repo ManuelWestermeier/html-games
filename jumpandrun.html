@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="de">
 <head>
 <meta charset="utf-8" />
@@ -110,7 +109,7 @@ font-weight:700;display:none;
    - 3 Leben
    - Tötung eines Gegners: Multiplikator x2 für 10s + Schirm (Unsterblich) 3s
    - Shield visuals & temporary invulnerability on respawn
-   - Multiple map themes (Wüste, Schlamm, Wald, City, Night, ...), switch beim Fortschritt
+   - Multiple map themes (Wüste, Schlamm, Wald, City, Night), switch beim Fortschritt
    - Cleanly integrated into the existing architecture
 */
 
@@ -157,7 +156,7 @@ addEventListener('pointerdown', e => {
   activePointer = e.pointerId;
   pointerStart = { x: e.clientX, y: e.clientY, t: performance.now() };
   pointerMoved = false;
-  try { (e.target).setPointerCapture(activePointer); } catch (err) {}
+  try { e.target.setPointerCapture(activePointer); } catch (err) {}
   updatePointerMovement(e.clientX, e.clientY);
 });
 
@@ -182,7 +181,7 @@ addEventListener('pointerup', e => {
   activePointer = null;
   pointerStart = null;
   pointerMoved = false;
-  try { (e.target).releasePointerCapture(e.pointerId); } catch (err) {}
+  try { e.target.releasePointerCapture(e.pointerId); } catch (err) {}
 });
 
 addEventListener('pointercancel', e => {
@@ -350,9 +349,10 @@ function spawnNext(){
   const x = last.x + last.w + gap;
   plats.push({ x, y, w, h: 18 });
 
-  // theme-based spikes/enemy chances
+  // theme-based spikes/enemy chances: position relative to new platform
   if (Math.random() < (currentTheme.spikeChance || 0.28)){
-    spikes.push({ x: x - rndInt(40, Math.max(60, gap - 20)), y: c.height - 44, w: 30, h: 30 });
+    const sx = x + rndInt(10, Math.max(20, w - 40));
+    spikes.push({ x: sx, y: y - 30, w: 30, h: 30 });
   }
 
   if (Math.random() < (currentTheme.enemyChance || 0.32)){
@@ -402,14 +402,18 @@ function handleTap(clientX, clientY){
       return;
     }
   }
-  bullets.push({
-    x: player.x + player.w,
-    y: player.y + player.h * 0.45,
-    vx: 12,
-    owner: 'player',
-    w: 10, h: 4
-  });
-  lastShot = performance.now();
+  // shoot if no enemy tapped
+  const now = performance.now();
+  if (now - lastShot > SHOT_CD){
+    bullets.push({
+      x: player.x + player.w,
+      y: player.y + player.h * 0.45,
+      vx: 12,
+      owner: 'player',
+      w: 10, h: 4
+    });
+    lastShot = now;
+  }
 }
 
 /* ====== Death / life handling ====== */
@@ -417,7 +421,6 @@ function loseLife(reason){
   const now = performance.now();
   // if shield or invulnerable, ignore
   if ((shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil)) {
-    // soft feedback
     showMsg('Unberührbar', 800);
     return;
   }
@@ -460,6 +463,8 @@ function update(){
   if (dead) return;
   tick++;
 
+  const now = performance.now();
+
   // update theme based on distance
   if (dist > nextThemeAt){
     themeIndex = (themeIndex + 1) % THEMES.length;
@@ -469,13 +474,12 @@ function update(){
   }
 
   // distance increment uses multiplier
-  const now = performance.now();
-  const multFactor = multActive && now < multUntil ? 2 : 1;
+  const multFactor = (multActive && now < multUntil) ? 2 : 1;
   if (multActive && now >= multUntil) multActive = false;
   if (shieldActive && now >= shieldUntil) shieldActive = false;
 
-  dist += speed * multFactor;
-  tick += 0; // keep tick for animation
+  dist += speed * (multFactor / 10); // scale down to avoid extremely fast numbers
+  // accelerate over time
   if (tick % 600 === 0) speed = Math.min(12, speed + 0.25);
 
   // horizontal input (arrow keys OR WASD)
@@ -488,7 +492,7 @@ function update(){
     player.on = false;
   }
 
-  // boost
+  // boost (B)
   if (keys['KeyB'] && boostReady){
     boostReady = false;
     player.boosting = true;
@@ -509,7 +513,7 @@ function update(){
     boostEl.textContent = 'READY';
   }
 
-  // shooting (S)
+  // shooting (S) - continuous fire if held
   if (keys['KeyS'] && now - lastShot > SHOT_CD){
     bullets.push({
       x: player.x + player.w,
@@ -657,6 +661,12 @@ function update(){
   } else {
     shieldEl.textContent = 'OFF';
   }
+
+  // boost cooldown display
+  if (!boostReady){
+    const left = Math.max(0, nextBoost - now);
+    boostEl.textContent = left > 0 ? `${(left/1000).toFixed(1)}s` : 'READY';
+  }
 }
 
 /* ====== Drawing ====== */
@@ -669,7 +679,6 @@ function draw(){
 
   // parallax decor lines / dust / city lights for themes
   if (currentTheme.name === 'Night'){
-    // subtle stars
     for (let i=0;i<80;i++){
       const sx = (i * 123 + tick*0.15) % c.width;
       ctx.globalAlpha = 0.06 + (Math.sin((tick+i)*0.02)*0.02);
@@ -741,7 +750,7 @@ function draw(){
     ctx.globalAlpha = 1;
   }
 
-  // player aura for boost
+  // player aura for boost & shield visuals
   ctx.save();
   ctx.translate(player.x + player.w/2, player.y + player.h/2);
   if (player.boosting){
@@ -751,11 +760,9 @@ function draw(){
     ctx.fill();
   }
 
-  // shield visual (pulsing)
   const now = performance.now();
   const isShield = (shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil);
   if (isShield){
-    const remain = Math.max(0, (Math.min(shieldUntil || 0, invulnerableUntil || 0) - now));
     ctx.globalAlpha = 0.35 + 0.15 * Math.sin(now * 0.02);
     ctx.beginPath();
     ctx.ellipse(0, 6, player.w + 20, player.h + 36, 0, 0, Math.PI * 2);
@@ -786,7 +793,6 @@ addEventListener('click', e => {
 });
 
 /* ====== Main loop ====== */
-let lastFrame = performance.now();
 function loop(){
   update();
   ctx.clearRect(0,0,c.width,c.height);
