@@ -201,7 +201,7 @@ canvas{display:block;position:fixed;inset:0;z-index:0}
 <div id="touchHint">Tippe Gegner zum töten oder springen · W/A/S/D oder Pfeile · Swipe bewegt</div>
 
 <script>
-/* Single-file playful runner — improved visuals, quips, sounds, confetti, better HUD.
+/* Single-file playful runner — improved respawn (spawn from top + 5s invulnerability) and lazy camera follow.
    Full game returned as requested.
 */
 
@@ -304,6 +304,9 @@ function updatePointerMovement(px, py){
 /* ====== Player & physics ====== */
 const player = { x:140, y:0, w:38, h:48, vx:0, vy:0, on:false, jump:15, acc:1.4, boosting:false, lives:3, face: ':-)' };
 const GRAV = 0.95, FRICTION = 0.86;
+
+/* ====== Camera (lazy follow) ====== */
+let camX = 0, camY = 0; // world-space camera offsets
 
 /* ====== World ====== */
 let plats = [], spikes = [], enemies = [], bullets = [], particles = [], confetti = [];
@@ -437,7 +440,8 @@ function spawnNext(){
   plats.push({ x, y, w, h:18 });
 
   if (Math.random() < (currentTheme.spikeChance || 0.28)){
-    spikes.push({ x: x - rndInt(30, Math.max(60, gap - 20)), y: c.height/ (devicePixelRatio||1) - 44, w: 30, h: 30 });
+    // place spike relative to the platform so it stands on it
+    spikes.push({ x: x - rndInt(30, Math.max(60, gap - 20)), y: y - 30, w: 30, h: 30 });
   }
 
   if (Math.random() < (currentTheme.enemyChance || 0.32)){
@@ -466,7 +470,7 @@ function killEnemy(e, bouncePlayer){
 
 /* ====== Tap handling (click enemy or shoot) ====== */
 function handleTap(clientX, clientY){
-  const x = clientX, y = clientY;
+  const x = clientX + camX, y = clientY + camY; // map pointer to world coords using camera
   // check enemies topmost
   for (let i=enemies.length-1;i>=0;i--){
     const e = enemies[i];
@@ -483,7 +487,7 @@ function handleTap(clientX, clientY){
   }
 }
 
-/* ====== Life & death ====== */
+/* ====== Life & death (improved respawn) ====== */
 function loseLife(reason){
   const now = performance.now();
   if ((shieldActive && now < shieldUntil) || (invulnerableUntil && now < invulnerableUntil)) {
@@ -494,9 +498,20 @@ function loseLife(reason){
   playSfx('hurt');
 
   if (player.lives > 0){
-    showMsg(`Leben verloren · verbleibend: ${player.lives}`, 1000);
-    player.x = 140; player.y = innerHeight - 220; player.vx = 0; player.vy = 0;
-    invulnerableUntil = performance.now() + 1200; shieldActive = true; shieldUntil = performance.now() + 1200;
+    // improved respawn: drop from above, 5s invulnerability (unddiable)
+    showMsg(`Respawn...`, 1400);
+    // position player above the camera so they "drop in"
+    player.vx = 0; player.vy = 2;
+    // try to spawn near current camera center so player re-enters play area
+    player.x = Math.max(player.x, camX + 140);
+    player.y = -player.h - 40;
+
+    const INV_MS = 5000;
+    invulnerableUntil = now + INV_MS;
+    shieldActive = true; shieldUntil = now + INV_MS; // visual shield during invul
+    // give a small grace so camera eases to show player
+    camY = Math.min(camY, player.y - innerHeight * 0.35);
+    playSfx('jump');
     return;
   }
 
@@ -516,7 +531,7 @@ function finalDeath(reason){
 
 /* ====== UI updates ====== */
 function updateLivesUI(){
-  // show heart icons according to player.lives (max 6)
+  // show heart icons according to player.lives (max 3)
   const total = Math.max(0, player.lives);
   const hearts = [];
   for (let i=0;i<3;i++){
@@ -545,6 +560,7 @@ function restartGame(fullReset=true){
   multEl.textContent = 'x1'; shieldEl.textContent = 'OFF';
   themeIndex = 0; currentTheme = THEMES[0]; nextThemeAt = 1200; themeTag.textContent = currentTheme.name;
   deathOverlay.style.display = 'none';
+  camX = 0; camY = 0;
 }
 
 function startGame(){
@@ -698,19 +714,32 @@ function update(){
   scoreEl.textContent = Math.floor(dist);
   multEl.innerHTML = (multActive && now < multUntil) ? '<span class="pulse">x2</span>' : 'x1';
   if (shieldActive && now < shieldUntil) shieldEl.textContent = `${((shieldUntil-now)/1000).toFixed(1)}s`; else shieldEl.textContent = 'OFF';
+
+  // CAMERA: lazy follow (vertical + slight horizontal)
+  // desired camera puts player around 40% from top
+  const desiredCamY = player.y - innerHeight * 0.38;
+  camY += (desiredCamY - camY) * 0.08; // smoothing factor
+
+  // slight horizontal follow so player feels dynamic (clamped)
+  const desiredCamX = clamp(player.x - 140, 0, 300);
+  camX += (desiredCamX - camX) * 0.04;
 }
 
 /* ====== Drawing ====== */
 function draw(){
-  // background
+  // background (static)
   const h = innerHeight, w = innerWidth;
   const g = ctx.createLinearGradient(0,0,0,h);
   g.addColorStop(0, currentTheme.bg[0]); g.addColorStop(1, currentTheme.bg[1]);
   ctx.fillStyle = g; ctx.fillRect(0,0,w,h);
 
-  // playful parallax
+  // playful parallax (background stripes unaffected by camera for depth)
   ctx.fillStyle = 'rgba(255,255,255,0.04)';
-  for (let i=0;i<60;i++) ctx.fillRect((tick*0.12 + i*210) % w, (i*26)%h, 110, 2);
+  for (let i=0;i<60;i++) ctx.fillRect(((tick*0.12 + i*210) % w), (i*26)%h, 110, 2);
+
+  // world & actors (translated by camera)
+  ctx.save();
+  ctx.translate(-Math.round(camX), -Math.round(camY));
 
   // draw platforms
   for (const pl of plats){
@@ -800,7 +829,9 @@ function draw(){
   }
   ctx.restore();
 
-  // small HUD map name
+  ctx.restore(); // restore camera
+
+  // small HUD map name (screen-space)
   ctx.fillStyle = 'rgba(255,255,255,0.03)';
   ctx.fillRect(w - 170, 12, 156, 30);
   ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.font = '13px Inter, system-ui';
