@@ -804,6 +804,7 @@
       coinsSpent: 0,
       kills: 0,
       level: 1,
+      elapsed: 0,
       nextLifeScore: 500,
       levelFlash: 0,
       player: {
@@ -834,7 +835,7 @@
       particles: [],
       beams: [],
       spawnCd: 0,
-      spawnBase: 1.2,
+      spawnBase: 0.85,
       cameraShake: 0,
       bossHint: 0,
       killStreak: 0,
@@ -970,20 +971,20 @@
   function spawnEnemy() {
     const difficulty = game.level;
     const pool = difficulty < 2 ? ['basic', 'basic', 'fast'] :
-                 difficulty < 5 ? ['basic', 'fast', 'tank', 'zigzag'] :
-                 difficulty < 8 ? ['fast', 'tank', 'zigzag', 'shooter'] :
-                 difficulty < 12 ? ['tank', 'zigzag', 'shooter', 'elite'] :
-                 ['shooter', 'elite', 'elite', 'fast'];
+                 difficulty < 4 ? ['basic', 'fast', 'tank', 'zigzag'] :
+                 difficulty < 7 ? ['fast', 'tank', 'zigzag', 'shooter'] :
+                 difficulty < 10 ? ['tank', 'zigzag', 'shooter', 'elite'] :
+                 ['zigzag', 'shooter', 'elite', 'elite'];
 
     const type = pool[Math.floor(Math.random() * pool.length)];
     const cfg = ENEMY_TYPES[type];
-    const scale = 1 + difficulty * 0.12;
-    const w = Math.round(rnd(cfg.w[0], cfg.w[1]) * (1 + difficulty * 0.02));
-    const h = Math.round(rnd(cfg.h[0], cfg.h[1]) * (1 + difficulty * 0.02));
+    const scale = 1 + difficulty * 0.16;
+    const w = Math.round(rnd(cfg.w[0], cfg.w[1]) * (1 + difficulty * 0.03));
+    const h = Math.round(rnd(cfg.h[0], cfg.h[1]) * (1 + difficulty * 0.03));
     const speed = rnd(cfg.speed[0], cfg.speed[1]) * scale;
-    const y = rnd(60, innerHeight - 90);
-    const hp = Math.ceil(cfg.hp * (1 + difficulty * 0.24));
-    const dropBias = 1 + difficulty * 0.12;
+    const y = rnd(50, innerHeight - 80);
+    const hp = Math.ceil(cfg.hp * (1 + difficulty * 0.28));
+    const dropBias = 1 + difficulty * 0.15;
     game.enemies.push({
       type,
       x: innerWidth + 40,
@@ -1187,7 +1188,7 @@
 
     const points = Math.floor(enemy.score * (1 + game.level * 0.08));
     game.score += points;
-    game.player.superMeter = clamp(game.player.superMeter + 7 + game.level * 0.25, 0, 100);
+    game.player.superMeter = clamp(game.player.superMeter + 6 + game.level * 0.22, 0, 100);
     game.killStreak += 1;
     game.bestStreak = Math.max(game.bestStreak, game.killStreak);
     save.bestScore = Math.max(save.bestScore, Math.floor(game.score));
@@ -1244,17 +1245,22 @@
   }
 
   function updateDifficulty() {
-    game.level = 1 + Math.floor(game.score / 350);
+    const prevLevel = game.level;
+    game.level = 1 + Math.floor(game.elapsed / 20);
+    if (game.level !== prevLevel) {
+      game.levelFlash = 1.0;
+      setHint(`Level ${game.level}`);
+    }
     const progress = game.level;
-    const spawn = 1.05 - progress * 0.03;
-    game.spawnBase = clamp(spawn, 0.11, 1.05);
+    const spawn = 0.85 - (progress - 1) * 0.035;
+    game.spawnBase = clamp(spawn, 0.08, 0.85);
   }
 
   function updateGame(dt) {
     const p = game.player;
-    const speed = 390 + getUpgradeValue('firerate') * 10;
-    const accel = 1500;
-    const damp = 0.83;
+    const speed = 560 + getUpgradeValue('firerate') * 12;
+    const accel = 2200;
+    const damp = 0.88;
 
     p.fireCd = Math.max(0, p.fireCd - dt * 1000);
     p.inv = Math.max(0, p.inv - dt);
@@ -1291,10 +1297,11 @@
     game.spawnCd -= dt;
     if (game.spawnCd <= 0) {
       spawnEnemy();
-      if (game.level >= 9 && chance(clamp((game.level - 8) * 0.06, 0.12, 0.38))) spawnEnemy();
-      if (game.level >= 18 && chance(0.18)) spawnEnemy();
-      const speedup = clamp(1 - game.level * 0.02, 0.22, 1);
-      game.spawnCd = game.spawnBase * speedup * rnd(0.68, 1.0);
+      if (game.level >= 4 && chance(clamp((game.level - 3) * 0.10, 0.12, 0.55))) spawnEnemy();
+      if (game.level >= 8 && chance(clamp((game.level - 7) * 0.08, 0.10, 0.45))) spawnEnemy();
+      if (game.level >= 14 && chance(0.22)) spawnEnemy();
+      const speedup = clamp(1 - game.level * 0.045, 0.12, 1);
+      game.spawnCd = game.spawnBase * speedup * rnd(0.52, 0.88);
     }
 
     if ((keys.Space || mouse.down) && p.fireCd <= 0) {
