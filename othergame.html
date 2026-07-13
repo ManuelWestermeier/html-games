@@ -1226,21 +1226,17 @@
   function takeDamage(amount) {
     const p = game.player;
     if (p.inv > 0 || p.superActive > 0) return;
-    p.hp -= amount;
-    p.inv = 1.25;
-    game.cameraShake = 0.35;
-    spawnParticles(p.x + p.w / 2, p.y + p.h / 2, '#ff6677', 20, 0.7);
-    if (p.hp <= 0) {
-      if (p.lives > 0) {
-        p.lives -= 1;
-        p.hp = p.maxHp;
-        p.inv = 2.2;
-        p.superMeter = Math.max(0, p.superMeter - 20);
-        setHint('1 Life consumed');
-        addFloatingText(p.x + 18, p.y + 8, '-LIFE', '#ff6677');
-      } else {
-        gameOver();
-      }
+    p.inv = 1.05;
+    game.cameraShake = 0.42;
+    spawnParticles(p.x + p.w / 2, p.y + p.h / 2, '#ff6677', 24, 0.75);
+    p.lives -= 1;
+    p.hp = p.maxHp;
+    p.superMeter = Math.max(0, p.superMeter - 25);
+    setHint('1 Life consumed');
+    addFloatingText(p.x + 18, p.y + 8, '-LIFE', '#ff6677');
+    if (p.lives <= 0) {
+      gameOver();
+      return;
     }
   }
 
@@ -1252,8 +1248,8 @@
       setHint(`Level ${game.level}`);
     }
     const progress = game.level;
-    const spawn = 0.85 - (progress - 1) * 0.035;
-    game.spawnBase = clamp(spawn, 0.08, 0.85);
+    const spawn = 0.78 - (progress - 1) * 0.042;
+    game.spawnBase = clamp(spawn, 0.06, 0.78);
   }
 
   function updateGame(dt) {
@@ -1297,10 +1293,10 @@
     game.spawnCd -= dt;
     if (game.spawnCd <= 0) {
       spawnEnemy();
-      if (game.level >= 4 && chance(clamp((game.level - 3) * 0.10, 0.12, 0.55))) spawnEnemy();
-      if (game.level >= 8 && chance(clamp((game.level - 7) * 0.08, 0.10, 0.45))) spawnEnemy();
-      if (game.level >= 14 && chance(0.22)) spawnEnemy();
-      const speedup = clamp(1 - game.level * 0.045, 0.12, 1);
+      if (game.level >= 3 && chance(clamp((game.level - 2) * 0.12, 0.14, 0.62))) spawnEnemy();
+      if (game.level >= 6 && chance(clamp((game.level - 5) * 0.10, 0.12, 0.52))) spawnEnemy();
+      if (game.level >= 10 && chance(0.28)) spawnEnemy();
+      const speedup = clamp(1 - game.level * 0.052, 0.10, 1);
       game.spawnCd = game.spawnBase * speedup * rnd(0.52, 0.88);
     }
 
