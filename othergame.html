@@ -35,8 +35,9 @@
   canvas{position:absolute;inset:0;width:100%;height:100%}
 
   .screen{
-    position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+    position:absolute;inset:0;display:flex;align-items:flex-start;justify-content:center;
     padding:24px;transition:opacity .2s ease; backdrop-filter: blur(4px);
+    overflow:auto;
   }
   .screen.hidden{opacity:0;pointer-events:none}
 
@@ -47,6 +48,8 @@
     box-shadow:var(--shadow);
     border-radius:24px;
     padding:24px;
+    max-height:calc(100vh - 48px);
+    overflow:auto;
   }
 
   .title-wrap{
@@ -114,12 +117,12 @@
   .toggle.on .dot{background:var(--green)}
 
   .menu-grid{
-    display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:start
+    display:grid;grid-template-columns:1fr 1fr;gap:18px;align-items:stretch
   }
   .wide{grid-column:1 / -1}
 
   .shop-grid{
-    display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px
+    display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:10px;max-height:56vh;overflow:auto;padding-right:4px
   }
   .shop-item{
     background:rgba(255,255,255,.02);border:1px solid rgba(96,140,185,.16);border-radius:16px;padding:12px
@@ -182,7 +185,7 @@
     font:900 clamp(36px, 7vw, 64px)/1 var(--mono);letter-spacing:4px;color:var(--text)
   }
 
-  .list{display:grid;gap:8px}
+  .list{display:grid;gap:8px;max-height:56vh;overflow:auto;padding-right:4px}
   .score-row{
     display:flex;justify-content:space-between;gap:10px;align-items:center;
     background:rgba(255,255,255,.02);border:1px solid rgba(96,140,185,.16);border-radius:14px;padding:10px 12px;font:700 12px/1.2 var(--mono)
@@ -205,6 +208,11 @@
   .footer{
     margin-top:16px;display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;color:var(--muted);font:500 12px/1.5 var(--mono)
   }
+  *::-webkit-scrollbar{width:10px;height:10px}
+  *::-webkit-scrollbar-track{background:rgba(255,255,255,.03);border-radius:999px}
+  *::-webkit-scrollbar-thumb{background:rgba(92,200,255,.28);border-radius:999px;border:2px solid rgba(7,16,24,.65)}
+  *::-webkit-scrollbar-thumb:hover{background:rgba(92,200,255,.42)}
+
 
   @media (max-width: 860px){
     .title-wrap,.menu-grid{grid-template-columns:1fr}
@@ -278,8 +286,8 @@
         </div>
 
         <div class="footer">
-          <div>WASD / Pfeile bewegen · Space / Maus schießen · Q Super · ESC Pause</div>
-          <div>Extra Leben alle 1000 Score</div>
+          <div>WASD / Pfeile bewegen · Space schießen · Q Super · ESC Pause</div>
+          <div>Extra Leben alle 500 Score</div>
         </div>
       </div>
 
@@ -609,7 +617,7 @@
   function refreshMenus() {
     els.menuBest.textContent = save.bestScore | 0;
     els.menuCoins.textContent = save.wallet | 0;
-    els.menuLives.textContent = `+${Math.floor(save.bestScore / 1000)}`;
+    els.menuLives.textContent = `+${Math.floor(save.bestScore / 500)}`;
     els.menuSkin.textContent = currentSkinDef().name;
     els.menuWeapon.textContent = currentWeaponDef().name;
 
@@ -785,7 +793,7 @@
   }
 
   function startGame() {
-    const baseLives = 3 + Math.floor(save.bestScore / 1000);
+    const baseLives = 3;
     const skin = currentSkinDef();
     const weapon = currentWeaponDef();
 
@@ -796,7 +804,7 @@
       coinsSpent: 0,
       kills: 0,
       level: 1,
-      nextLifeScore: 1000,
+      nextLifeScore: 500,
       levelFlash: 0,
       player: {
         x: 110,
@@ -1118,22 +1126,27 @@
       const offset = pellets > 1 ? (i - (pellets - 1) / 2) * baseSpread : 0;
       const a = ang + offset + rnd(-baseSpread * 0.15, baseSpread * 0.15);
       const speed = w.speed;
+      const vx = Math.cos(a) * speed;
+      const vy = Math.sin(a) * speed;
       game.bullets.push({
         x: muzzle.x,
         y: muzzle.y,
-        vx: Math.cos(a) * speed,
-        vy: Math.sin(a) * speed,
-        r: w.id === 'rail' ? 4 : 3,
+        px: muzzle.x - vx * 0.016,
+        py: muzzle.y - vy * 0.016,
+        vx,
+        vy,
+        r: w.id === 'rail' ? 5 : 4,
         damage: w.damage * mult,
         pierce: w.pierce,
         color: w.color,
         life: 2.8,
-        trail: 0
+        trail: 0,
+        enemyShot: false
       });
     }
     game.player.fireCd = weaponCooldown(w.id);
     game.player.ammo = clamp(game.player.ammo - w.ammoCost, 0, game.player.ammoMax);
-    spawnParticles(muzzle.x, muzzle.y, w.color, 6, 0.35);
+    spawnParticles(muzzle.x, muzzle.y, w.color, 10, 0.4);
   }
 
   function applyLaser(dt) {
@@ -1185,7 +1198,7 @@
 
     if (game.score >= game.nextLifeScore) {
       game.player.lives += 1;
-      game.nextLifeScore += 1000;
+      game.nextLifeScore += 500;
       setHint('Extra Life +1');
       addFloatingText(game.player.x + 20, game.player.y - 10, '+LIFE', '#6CFF8F');
     }
@@ -1298,6 +1311,8 @@
     // bullets
     for (let i = game.bullets.length - 1; i >= 0; i--) {
       const b = game.bullets[i];
+      b.px = b.x;
+      b.py = b.y;
       b.x += b.vx * dt;
       b.y += b.vy * dt;
       b.life -= dt;
@@ -1311,7 +1326,7 @@
         if (!e.alive) continue;
         if (rectHit(b, e)) {
           e.hp -= b.damage;
-          spawnParticles(b.x, b.y, b.color, 4, 0.25);
+          spawnParticles(b.x, b.y, b.color, 8, 0.3);
           if (e.hp <= 0) {
             killEnemy(e, b);
             if (b.pierce > 0) b.pierce -= 1;
@@ -1344,7 +1359,7 @@
           const dy = (p.y + p.h/2) - cy;
           const len = Math.hypot(dx, dy) || 1;
           const sp = 260 + game.level * 8;
-          game.bullets.push({ x: cx, y: cy, vx: dx/len * sp, vy: dy/len * sp, r: 3, damage: 1.1 + game.level*0.04, pierce: 0, color: '#ffd85e', life: 3, enemyShot:true });
+          game.bullets.push({ x: cx, y: cy, px: cx - (dx/len * sp) * 0.016, py: cy - (dy/len * sp) * 0.016, vx: dx/len * sp, vy: dy/len * sp, r: 4, damage: 1.1 + game.level*0.04, pierce: 0, color: '#ffd85e', life: 3, enemyShot:true });
         }
       }
       e.y = clamp(e.y, 24, innerHeight - e.h - 24);
@@ -1423,7 +1438,7 @@
     if (game.score >= game.nextLifeScore) {
       while (game.score >= game.nextLifeScore) {
         game.player.lives += 1;
-        game.nextLifeScore += 1000;
+        game.nextLifeScore += 500;
         setHint('Extra Life +1');
       }
     }
@@ -1655,23 +1670,40 @@
   function drawBullets() {
     for (const b of game.bullets) {
       ctx.save();
-      const grad = ctx.createLinearGradient(b.x - 10, b.y, b.x + 10, b.y);
-      grad.addColorStop(0, 'rgba(0,0,0,0)');
-      grad.addColorStop(1, b.color);
-      ctx.fillStyle = grad;
-      ctx.shadowBlur = 16;
-      ctx.shadowColor = b.color;
-      if (Math.abs(b.vx) + Math.abs(b.vy) > 0) {
-        const ang = Math.atan2(b.vy, b.vx);
-        ctx.translate(b.x, b.y);
-        ctx.rotate(ang);
-        roundRect(ctx, -12, -2, 24, 4, 2);
-        ctx.fill();
-      } else {
-        ctx.beginPath();
-        ctx.arc(b.x, b.y, b.r, 0, Math.PI * 2);
-        ctx.fill();
-      }
+      const dx = b.x - (b.px ?? b.x);
+      const dy = b.y - (b.py ?? b.y);
+      const len = Math.hypot(dx, dy) || 1;
+      const ang = Math.atan2(dy, dx);
+
+      ctx.translate(b.x, b.y);
+      ctx.rotate(ang);
+
+      const coreColor = b.enemyShot ? '#fff2a6' : '#ffffff';
+      const glowColor = b.color || (b.enemyShot ? '#ffd85e' : '#5cc8ff');
+
+      ctx.globalAlpha = 0.2;
+      ctx.strokeStyle = glowColor;
+      ctx.lineWidth = b.enemyShot ? 12 : 10;
+      ctx.lineCap = 'round';
+      ctx.shadowBlur = 26;
+      ctx.shadowColor = glowColor;
+      ctx.beginPath();
+      ctx.moveTo(-Math.min(len, 24), 0);
+      ctx.lineTo(0, 0);
+      ctx.stroke();
+
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = glowColor;
+      ctx.shadowBlur = 20;
+      ctx.shadowColor = glowColor;
+      roundRect(ctx, -14, -3, 28, 6, 3);
+      ctx.fill();
+
+      ctx.fillStyle = coreColor;
+      ctx.shadowBlur = 0;
+      roundRect(ctx, -9, -1.5, 18, 3, 2);
+      ctx.fill();
+
       ctx.restore();
     }
   }
@@ -1901,7 +1933,7 @@
   setInterval(() => {
     if (state === 'title') {
       const weapon = currentWeaponDef();
-      const livesBonus = `+${Math.floor(save.bestScore / 1000)} Bonus-Leben`;
+      const livesBonus = `+${Math.floor(save.bestScore / 500)} Bonus-Leben`;
       els.hint.textContent = `${weapon.name} · ${livesBonus}`;
       els.hint.classList.add('show');
       setTimeout(() => els.hint.classList.remove('show'), 1200);
