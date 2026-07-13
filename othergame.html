@@ -1,0 +1,1076 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DODGE.EXE</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=Space+Mono:wght@400;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:      #080C10;
+    --surface: #0E1419;
+    --panel:   #131920;
+    --border:  #1E2D3D;
+    --green:   #39FF14;
+    --red:     #FF3B3B;
+    --blue:    #00B4FF;
+    --yellow:  #FFD600;
+    --purple:  #C084FC;
+    --white:   #E8F4FD;
+    --muted:   #4A6377;
+    --mono:    'Space Mono', monospace;
+    --sans:    'Space Grotesk', sans-serif;
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--white);
+    font-family: var(--sans);
+    overflow: hidden;
+    user-select: none;
+  }
+
+  /* ── SCREENS ── */
+  .screen {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    transition: opacity .25s;
+  }
+  .screen.hidden { opacity: 0; pointer-events: none; }
+
+  /* ── CANVAS ── */
+  #canvas {
+    position: absolute; inset: 0;
+    width: 100%; height: 100%;
+  }
+
+  /* ── HUD (in-game overlay) ── */
+  #hud {
+    position: absolute; inset: 0;
+    pointer-events: none;
+    font-family: var(--mono);
+  }
+  #hud.hidden { display: none; }
+
+  .hud-top {
+    position: absolute; top: 0; left: 0; right: 0;
+    display: flex; justify-content: space-between; align-items: flex-start;
+    padding: 18px 24px 0;
+  }
+  .hud-block {
+    background: rgba(8,12,16,.75);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 14px;
+    backdrop-filter: blur(6px);
+  }
+  .hud-label {
+    font-size: 9px; letter-spacing: 2px; text-transform: uppercase;
+    color: var(--muted); margin-bottom: 2px;
+  }
+  .hud-value {
+    font-size: 22px; font-weight: 700; line-height: 1;
+    color: var(--green);
+  }
+  .hud-value.blue  { color: var(--blue); }
+  .hud-value.yellow{ color: var(--yellow); }
+  .hud-value.white { color: var(--white); }
+
+  /* health bar */
+  .health-bar-wrap {
+    position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
+    display: flex; align-items: center; gap: 10px;
+    background: rgba(8,12,16,.8);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 7px 16px;
+  }
+  .health-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); }
+  .health-bar-track {
+    width: 160px; height: 8px;
+    background: var(--surface);
+    border-radius: 999px; overflow: hidden;
+  }
+  .health-bar-fill {
+    height: 100%; border-radius: 999px;
+    background: var(--green);
+    transition: width .15s, background .3s;
+  }
+  .health-count { font-size: 12px; color: var(--white); min-width: 28px; text-align: right; }
+
+  /* ammo pips */
+  .ammo-wrap {
+    position: absolute; bottom: 20px; right: 24px;
+    display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
+    background: rgba(8,12,16,.8);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px;
+  }
+  .ammo-label { font-size: 9px; letter-spacing: 2px; color: var(--muted); }
+  .ammo-pips { display: flex; gap: 5px; }
+  .pip {
+    width: 10px; height: 14px; border-radius: 3px;
+    background: var(--blue);
+    transition: background .1s, transform .1s;
+  }
+  .pip.empty { background: var(--border); }
+
+  /* level flash */
+  #level-flash {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .2s;
+  }
+  #level-flash.show { opacity: 1; }
+  .flash-level { font-family: var(--mono); font-size: 11px; letter-spacing: 4px; color: var(--muted); }
+  .flash-name  { font-size: 52px; font-weight: 700; color: var(--yellow); line-height: 1; }
+
+  /* combo */
+  #combo-display {
+    position: absolute; top: 90px; left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--mono); font-size: 13px; letter-spacing: 2px;
+    color: var(--yellow);
+    opacity: 0; transition: opacity .3s;
+    pointer-events: none;
+  }
+  #combo-display.show { opacity: 1; }
+
+  /* ── TITLE SCREEN ── */
+  #title-screen {
+    background: radial-gradient(ellipse at 60% 30%, #0a1628 0%, var(--bg) 70%);
+  }
+  .title-eyebrow {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 5px;
+    color: var(--blue); margin-bottom: 14px;
+    text-transform: uppercase;
+  }
+  .title-main {
+    font-size: clamp(56px, 10vw, 96px); font-weight: 700; line-height: .95;
+    letter-spacing: -2px; margin-bottom: 6px;
+  }
+  .title-main span { color: var(--green); }
+  .title-sub {
+    font-family: var(--mono); font-size: 13px; color: var(--muted);
+    margin-bottom: 48px;
+  }
+
+  .controls-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 10px; margin-bottom: 40px;
+    max-width: 420px; width: 100%;
+  }
+  .ctrl-item {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 8px; padding: 10px 14px;
+  }
+  .ctrl-key {
+    font-family: var(--mono); font-size: 11px;
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 5px; padding: 3px 8px; color: var(--blue);
+    white-space: nowrap; flex-shrink: 0;
+  }
+  .ctrl-desc { font-size: 12px; color: var(--muted); }
+
+  .btn {
+    font-family: var(--mono); font-size: 14px; font-weight: 700;
+    letter-spacing: 2px; text-transform: uppercase;
+    border: none; border-radius: 8px; cursor: pointer;
+    padding: 14px 36px;
+    transition: transform .1s, box-shadow .1s;
+  }
+  .btn:active { transform: scale(.97); }
+  .btn-primary {
+    background: var(--green); color: var(--bg);
+    box-shadow: 0 0 28px rgba(57,255,20,.35);
+  }
+  .btn-primary:hover { box-shadow: 0 0 42px rgba(57,255,20,.55); }
+  .btn-secondary {
+    background: transparent; color: var(--muted);
+    border: 1px solid var(--border);
+  }
+  .btn-secondary:hover { color: var(--white); border-color: var(--muted); }
+
+  /* highscore list */
+  .hs-row {
+    display: flex; align-items: center; justify-content: space-between;
+    gap: 16px; padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+    font-family: var(--mono); font-size: 13px;
+  }
+  .hs-rank { color: var(--muted); width: 22px; }
+  .hs-name { color: var(--white); flex: 1; }
+  .hs-score { color: var(--green); }
+  .hs-level { color: var(--blue); font-size: 11px; }
+
+  /* ── GAMEOVER SCREEN ── */
+  #gameover-screen { gap: 0; }
+  .go-title {
+    font-size: clamp(42px, 8vw, 72px); font-weight: 700;
+    color: var(--red); letter-spacing: -1px; line-height: 1;
+    margin-bottom: 4px;
+  }
+  .go-sub { font-family: var(--mono); font-size: 12px; color: var(--muted); margin-bottom: 32px; }
+
+  .stats-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr);
+    gap: 12px; margin-bottom: 32px; max-width: 480px; width: 100%;
+  }
+  .stat-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px; text-align: center;
+  }
+  .stat-val {
+    font-family: var(--mono); font-size: 28px; font-weight: 700;
+    color: var(--yellow); line-height: 1; margin-bottom: 4px;
+  }
+  .stat-lbl { font-size: 10px; letter-spacing: 1.5px; color: var(--muted); text-transform: uppercase; }
+
+  .new-hs-badge {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 3px;
+    color: var(--yellow); background: rgba(255,214,0,.12);
+    border: 1px solid rgba(255,214,0,.3); border-radius: 6px;
+    padding: 6px 14px; margin-bottom: 20px;
+    display: none;
+  }
+  .new-hs-badge.show { display: block; }
+
+  .go-buttons { display: flex; gap: 12px; }
+
+  /* ── HIGHSCORE SCREEN ── */
+  .hs-panel {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 12px; padding: 24px; width: 380px;
+  }
+  .hs-title {
+    font-family: var(--mono); font-size: 11px; letter-spacing: 4px;
+    color: var(--blue); text-transform: uppercase; margin-bottom: 16px;
+  }
+  .hs-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 24px 0; }
+
+  /* ── PAUSE OVERLAY ── */
+  #pause-overlay {
+    position: absolute; inset: 0;
+    background: rgba(8,12,16,.8);
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 8px;
+    backdrop-filter: blur(4px);
+  }
+  #pause-overlay.hidden { display: none; }
+  .pause-title {
+    font-family: var(--mono); font-size: 40px; font-weight: 700;
+    color: var(--white); letter-spacing: 4px; margin-bottom: 12px;
+  }
+  .pause-hint { font-family: var(--mono); font-size: 11px; color: var(--muted); letter-spacing: 2px; }
+
+  /* scanlines aesthetic */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 2px,
+      rgba(0,0,0,.03) 2px, rgba(0,0,0,.03) 4px
+    );
+    z-index: 9999;
+  }
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+
+<!-- HUD -->
+<div id="hud" class="hidden">
+  <div class="hud-top">
+    <div class="hud-block">
+      <div class="hud-label">Score</div>
+      <div class="hud-value" id="hud-score">0</div>
+    </div>
+    <div class="hud-block" style="text-align:center">
+      <div class="hud-label">Level</div>
+      <div class="hud-value yellow" id="hud-level">1</div>
+    </div>
+    <div class="hud-block" style="text-align:center">
+      <div class="hud-label">Combo</div>
+      <div class="hud-value blue" id="hud-combo">x1</div>
+    </div>
+    <div class="hud-block" style="text-align:right">
+      <div class="hud-label">Best</div>
+      <div class="hud-value white" id="hud-best">0</div>
+    </div>
+  </div>
+
+  <div class="health-bar-wrap">
+    <div class="health-label">HP</div>
+    <div class="health-bar-track">
+      <div class="health-bar-fill" id="hp-fill" style="width:100%"></div>
+    </div>
+    <div class="health-count" id="hp-count">3</div>
+  </div>
+
+  <div class="ammo-wrap">
+    <div class="ammo-label">Ammo</div>
+    <div class="ammo-pips" id="ammo-pips"></div>
+  </div>
+
+  <div id="level-flash">
+    <div class="flash-level">LEVEL UP</div>
+    <div class="flash-name" id="flash-name">—</div>
+  </div>
+  <div id="combo-display"></div>
+</div>
+
+<div id="pause-overlay" class="hidden">
+  <div class="pause-title">PAUSED</div>
+  <div class="pause-hint">ESC / P to resume</div>
+  <div class="pause-hint" style="margin-top:24px">WASD / Arrows — Move &amp; Boost</div>
+  <div class="pause-hint">SPACE — Shoot</div>
+</div>
+
+<!-- TITLE SCREEN -->
+<div id="title-screen" class="screen">
+  <div class="title-eyebrow">— browser game —</div>
+  <div class="title-main">DODGE<span>.</span>EXE</div>
+  <div class="title-sub">survive · shoot · combo</div>
+
+  <div class="controls-grid">
+    <div class="ctrl-item"><span class="ctrl-key">↑ ↓</span><span class="ctrl-desc">Move up / down</span></div>
+    <div class="ctrl-item"><span class="ctrl-key">← →</span><span class="ctrl-desc">Brake / Boost</span></div>
+    <div class="ctrl-item"><span class="ctrl-key">SPACE</span><span class="ctrl-desc">Shoot bullet</span></div>
+    <div class="ctrl-item"><span class="ctrl-key">ESC / P</span><span class="ctrl-desc">Pause</span></div>
+  </div>
+
+  <div style="display:flex;gap:12px">
+    <button class="btn btn-primary" onclick="startGame()">START GAME</button>
+    <button class="btn btn-secondary" onclick="showHighscores()">HIGHSCORES</button>
+  </div>
+</div>
+
+<!-- HIGHSCORE SCREEN -->
+<div id="hs-screen" class="screen hidden">
+  <div class="hs-panel">
+    <div class="hs-title">— Top Scores —</div>
+    <div id="hs-list"></div>
+  </div>
+  <div style="margin-top:20px">
+    <button class="btn btn-secondary" onclick="showTitle()">BACK</button>
+  </div>
+</div>
+
+<!-- GAMEOVER SCREEN -->
+<div id="gameover-screen" class="screen hidden">
+  <div class="go-title">GAME OVER</div>
+  <div class="go-sub" id="go-sub">you made it to level 1</div>
+  <div class="new-hs-badge" id="hs-badge">★ NEW HIGH SCORE ★</div>
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-val" id="go-score">0</div><div class="stat-lbl">Score</div></div>
+    <div class="stat-card"><div class="stat-val" id="go-kills">0</div><div class="stat-lbl">Killed</div></div>
+    <div class="stat-card"><div class="stat-val" id="go-combo">x1</div><div class="stat-lbl">Best Combo</div></div>
+  </div>
+  <div class="go-buttons">
+    <button class="btn btn-primary" onclick="startGame()">PLAY AGAIN</button>
+    <button class="btn btn-secondary" onclick="showTitle()">MENU</button>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// CONSTANTS & CONFIG
+// ─────────────────────────────────────────────────────────────────────────────
+const CANVAS   = document.getElementById('canvas');
+const CTX      = CANVAS.getContext('2d');
+const MAX_HP   = 3;
+const MAX_AMMO = 8;
+const AMMO_REGEN_MS = 2200;
+const SHOOT_COOLDOWN = 220;
+const MAX_BULLETS = 12;
+const PARTICLE_POOL = 200;
+
+const LEVELS = [
+  { name: 'SECTOR 1',  spawnMs: 950,  speedMul: 1.0, types: ['basic'],                     scoreThresh: 0    },
+  { name: 'SECTOR 2',  spawnMs: 780,  speedMul: 1.25,types: ['basic','fast'],               scoreThresh: 300  },
+  { name: 'SECTOR 3',  spawnMs: 640,  speedMul: 1.5, types: ['basic','fast','big'],         scoreThresh: 800  },
+  { name: 'SECTOR 4',  spawnMs: 520,  speedMul: 1.8, types: ['basic','fast','big','zigzag'],scoreThresh: 1800 },
+  { name: 'SECTOR 5',  spawnMs: 400,  speedMul: 2.1, types: ['basic','fast','big','zigzag','homing'], scoreThresh: 3500 },
+  { name: 'SECTOR 6',  spawnMs: 300,  speedMul: 2.5, types: ['basic','fast','big','zigzag','homing'], scoreThresh: 6000 },
+  { name: '∞ VOID',    spawnMs: 230,  speedMul: 3.0, types: ['basic','fast','big','zigzag','homing'], scoreThresh: 10000},
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+// STATE
+// ─────────────────────────────────────────────────────────────────────────────
+let state = 'title'; // title | playing | paused | dead
+let player, obstacles, bullets, particles, explosions;
+let score, kills, hp, ammo, combo, bestCombo;
+let levelIdx, spawnTimer, ammoTimer, shootCooldown;
+let lastTime, dt;
+let keys = {};
+let highscores = JSON.parse(localStorage.getItem('dodge_hs') || '[]');
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RESIZE
+// ─────────────────────────────────────────────────────────────────────────────
+function resize() {
+  CANVAS.width  = window.innerWidth;
+  CANVAS.height = window.innerHeight;
+}
+window.addEventListener('resize', resize);
+resize();
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INPUT
+// ─────────────────────────────────────────────────────────────────────────────
+window.addEventListener('keydown', e => {
+  keys[e.code] = true;
+  if (state === 'playing') {
+    if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
+    if ((e.code === 'Space' || e.code === 'KeyX') && !e.repeat) tryShoot();
+  } else if (state === 'paused') {
+    if (e.code === 'Escape' || e.code === 'KeyP') togglePause();
+  }
+  e.code === 'Space' && e.preventDefault();
+});
+window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SCREEN MANAGEMENT
+// ─────────────────────────────────────────────────────────────────────────────
+function show(id) {
+  ['title-screen','hs-screen','gameover-screen'].forEach(s => {
+    document.getElementById(s).classList.toggle('hidden', s !== id);
+  });
+}
+function showTitle()      { state = 'title'; show('title-screen'); document.getElementById('hud').classList.add('hidden'); }
+function showHighscores() { renderHsList(); show('hs-screen'); }
+function showGameOver()   {
+  state = 'dead';
+  show('gameover-screen');
+  document.getElementById('go-score').textContent = score;
+  document.getElementById('go-kills').textContent = kills;
+  document.getElementById('go-combo').textContent = 'x' + bestCombo;
+  document.getElementById('go-sub').textContent   = 'you made it to ' + LEVELS[Math.min(levelIdx, LEVELS.length-1)].name;
+  // save highscore
+  const isNew = saveHighscore(score, levelIdx);
+  document.getElementById('hs-badge').classList.toggle('show', isNew);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HIGHSCORES
+// ─────────────────────────────────────────────────────────────────────────────
+function saveHighscore(s, lv) {
+  const entry = { score: s, level: lv, date: new Date().toLocaleDateString() };
+  highscores.push(entry);
+  highscores.sort((a,b) => b.score - a.score);
+  highscores = highscores.slice(0, 8);
+  localStorage.setItem('dodge_hs', JSON.stringify(highscores));
+  document.getElementById('hud-best').textContent = highscores[0]?.score || 0;
+  return highscores[0].score === s && highscores.filter(h => h.score === s).length === 1;
+}
+function renderHsList() {
+  const el = document.getElementById('hs-list');
+  if (!highscores.length) { el.innerHTML = '<div class="hs-empty">No scores yet.<br>Be the first!</div>'; return; }
+  el.innerHTML = highscores.map((h, i) => `
+    <div class="hs-row">
+      <span class="hs-rank">${i+1}</span>
+      <span class="hs-name">${h.date}</span>
+      <span class="hs-level">${LEVELS[Math.min(h.level, LEVELS.length-1)].name}</span>
+      <span class="hs-score">${h.score}</span>
+    </div>`).join('');
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GAME INIT
+// ─────────────────────────────────────────────────────────────────────────────
+function startGame() {
+  show('');
+  document.getElementById('hud').classList.remove('hidden');
+  document.getElementById('pause-overlay').classList.add('hidden');
+
+  const W = CANVAS.width, H = CANVAS.height;
+
+  player = {
+    x: 120, y: H / 2,
+    w: 36, h: 36,
+    vy: 0, vx: 0,
+    invincible: 0,   // ms of invincibility after hit
+    trail: [],
+  };
+
+  obstacles  = [];
+  bullets    = [];
+  particles  = [];
+  explosions = [];
+
+  score = 0; kills = 0; hp = MAX_HP; ammo = MAX_AMMO;
+  combo = 1; bestCombo = 1;
+  levelIdx = 0;
+  spawnTimer = 0;
+  ammoTimer  = 0;
+  shootCooldown = 0;
+
+  updateHUD();
+  buildAmmoPips();
+
+  state = 'playing';
+  lastTime = performance.now();
+  requestAnimationFrame(loop);
+}
+
+function togglePause() {
+  if (state === 'playing') {
+    state = 'paused';
+    document.getElementById('pause-overlay').classList.remove('hidden');
+  } else if (state === 'paused') {
+    state = 'playing';
+    document.getElementById('pause-overlay').classList.add('hidden');
+    lastTime = performance.now();
+    requestAnimationFrame(loop);
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// AMMO PIPS UI
+// ─────────────────────────────────────────────────────────────────────────────
+function buildAmmoPips() {
+  const el = document.getElementById('ammo-pips');
+  el.innerHTML = '';
+  for (let i = 0; i < MAX_AMMO; i++) {
+    const pip = document.createElement('div');
+    pip.className = 'pip' + (i >= ammo ? ' empty' : '');
+    pip.id = 'pip-' + i;
+    el.appendChild(pip);
+  }
+}
+function refreshAmmo() {
+  for (let i = 0; i < MAX_AMMO; i++) {
+    const p = document.getElementById('pip-' + i);
+    if (p) p.className = 'pip' + (i >= ammo ? ' empty' : '');
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// HUD UPDATES
+// ─────────────────────────────────────────────────────────────────────────────
+function updateHUD() {
+  document.getElementById('hud-score').textContent = score;
+  document.getElementById('hud-level').textContent = levelIdx + 1;
+  document.getElementById('hud-combo').textContent = 'x' + combo;
+  document.getElementById('hud-best').textContent  = highscores[0]?.score || 0;
+  // HP bar
+  const pct = (hp / MAX_HP * 100).toFixed(1);
+  const fill = document.getElementById('hp-fill');
+  fill.style.width = pct + '%';
+  fill.style.background = hp > 1 ? 'var(--green)' : 'var(--red)';
+  document.getElementById('hp-count').textContent = hp;
+  refreshAmmo();
+}
+
+function flashLevelUp() {
+  const el = document.getElementById('level-flash');
+  document.getElementById('flash-name').textContent = LEVELS[levelIdx].name;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 1800);
+}
+
+function showComboFlash() {
+  const el = document.getElementById('combo-display');
+  el.textContent = 'COMBO x' + combo + (combo >= 5 ? ' 🔥' : '');
+  el.classList.add('show');
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 800);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// SHOOTING
+// ─────────────────────────────────────────────────────────────────────────────
+function tryShoot() {
+  if (ammo <= 0 || shootCooldown > 0 || bullets.length >= MAX_BULLETS) return;
+  ammo--;
+  shootCooldown = SHOOT_COOLDOWN;
+  const b = {
+    x: player.x + player.w,
+    y: player.y + player.h / 2,
+    w: 18, h: 5,
+    speed: 920,
+    alive: true,
+  };
+  bullets.push(b);
+  // muzzle flash particles
+  for (let i = 0; i < 8; i++) spawnParticle(b.x, b.y, 'bullet-flash');
+  refreshAmmo();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OBSTACLE SPAWNING
+// ─────────────────────────────────────────────────────────────────────────────
+const OBS_TYPES = {
+  basic:   { wMin:40, wMax:80, hMin:40, hMax:80, sMin:4, sMax:7,   hp:1, color:'#FF3B3B', glow:'#FF3B3B' },
+  fast:    { wMin:24, wMax:44, hMin:24, hMax:44, sMin:9, sMax:15,  hp:1, color:'#FF8C00', glow:'#FF8C00' },
+  big:     { wMin:90, wMax:140,hMin:90, hMax:140,sMin:3, sMax:5.5, hp:3, color:'#C084FC', glow:'#C084FC' },
+  zigzag:  { wMin:32, wMax:56, hMin:32, hMax:56, sMin:6, sMax:10,  hp:1, color:'#00B4FF', glow:'#00B4FF' },
+  homing:  { wMin:28, wMax:46, hMin:28, hMax:46, sMin:5, sMax:8,   hp:2, color:'#FFD600', glow:'#FFD600' },
+};
+
+function spawnObstacle() {
+  const lv = LEVELS[Math.min(levelIdx, LEVELS.length-1)];
+  const type = lv.types[Math.floor(Math.random() * lv.types.length)];
+  const cfg  = OBS_TYPES[type];
+  const mul  = lv.speedMul;
+  const W = cfg.wMin + Math.random() * (cfg.wMax - cfg.wMin);
+  const H = cfg.hMin + Math.random() * (cfg.hMax - cfg.hMin);
+  const s = (cfg.sMin + Math.random() * (cfg.sMax - cfg.sMin)) * mul;
+  const o = {
+    x: CANVAS.width + 10, y: Math.random() * (CANVAS.height - H),
+    w: W, h: H, speed: s, type,
+    hp: cfg.hp, maxHp: cfg.hp,
+    color: cfg.color, glow: cfg.glow,
+    zig: 0, zigDir: 1, zigAmp: 90 + Math.random() * 60, zigFreq: 0.025 + Math.random() * 0.02,
+    alive: true,
+  };
+  obstacles.push(o);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PARTICLES
+// ─────────────────────────────────────────────────────────────────────────────
+function spawnParticle(x, y, kind, color) {
+  if (particles.length >= PARTICLE_POOL) particles.shift();
+  const p = { x, y, life: 1, kind };
+  if (kind === 'hit') {
+    p.vx = -2 + Math.random() * 4; p.vy = -4 + Math.random() * 8;
+    p.color = color || '#FF3B3B'; p.r = 3 + Math.random() * 4;
+  } else if (kind === 'explode') {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 2 + Math.random() * 7;
+    p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+    p.color = color || '#FF8C00'; p.r = 2 + Math.random() * 6;
+  } else if (kind === 'trail') {
+    p.vx = -1 + Math.random() * 0.5; p.vy = -1 + Math.random() * 2;
+    p.color = '#39FF14'; p.r = 2 + Math.random() * 3;
+  } else if (kind === 'bullet-flash') {
+    p.vx = -1 + Math.random() * 3; p.vy = -2 + Math.random() * 4;
+    p.color = '#00B4FF'; p.r = 2 + Math.random() * 3;
+  } else if (kind === 'bullet-hit') {
+    const a = Math.random() * Math.PI * 2;
+    const sp = 1 + Math.random() * 5;
+    p.vx = Math.cos(a) * sp; p.vy = Math.sin(a) * sp;
+    p.color = '#00B4FF'; p.r = 1 + Math.random() * 3;
+  } else if (kind === 'score') {
+    p.vx = 0; p.vy = -1.5; p.text = '+' + (color || 10); // color param = points
+    p.color = '#FFD600';
+  }
+  particles.push(p);
+}
+
+function spawnExplosion(x, y, w, h, color) {
+  const n = Math.min(6 + Math.floor(w / 10), 30);
+  for (let i = 0; i < n; i++) {
+    spawnParticle(
+      x + Math.random() * w,
+      y + Math.random() * h,
+      'explode', color
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// MAIN LOOP
+// ─────────────────────────────────────────────────────────────────────────────
+function loop(now) {
+  if (state !== 'playing') return;
+  dt = Math.min((now - lastTime) / 1000, 0.05);
+  lastTime = now;
+
+  update(dt);
+  draw();
+  requestAnimationFrame(loop);
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UPDATE
+// ─────────────────────────────────────────────────────────────────────────────
+function update(dt) {
+  const W = CANVAS.width, H = CANVAS.height;
+  const dtMs = dt * 1000;
+
+  // ── Level check
+  const newLv = LEVELS.findIndex((l, i) => score >= l.scoreThresh && (i === LEVELS.length-1 || score < LEVELS[i+1].scoreThresh));
+  if (newLv > levelIdx) { levelIdx = newLv; flashLevelUp(); }
+
+  // ── Shoot cooldown
+  shootCooldown = Math.max(0, shootCooldown - dtMs);
+
+  // ── Ammo regen
+  ammoTimer += dtMs;
+  if (ammoTimer >= AMMO_REGEN_MS && ammo < MAX_AMMO) {
+    ammo++; ammoTimer = 0; refreshAmmo();
+  }
+
+  // ── Player physics
+  const UP   = keys['ArrowUp']   || keys['KeyW'];
+  const DOWN = keys['ArrowDown'] || keys['KeyS'];
+  const LEFT = keys['ArrowLeft'] || keys['KeyA'];
+  const RIGHT= keys['ArrowRight']|| keys['KeyD'];
+
+  const accelY = 900, dragY = 0.035, maxVY = 440;
+  const accelX = 600, dragX = 0.05,  maxVX = 280;
+
+  if (UP)    player.vy -= accelY * dt;
+  if (DOWN)  player.vy += accelY * dt;
+  if (LEFT)  player.vx -= accelX * dt;
+  if (RIGHT) player.vx += accelX * dt;
+
+  player.vy *= (1 - dragY);
+  player.vx *= (1 - dragX);
+  player.vy  = Math.max(-maxVY, Math.min(maxVY, player.vy));
+  player.vx  = Math.max(-maxVX, Math.min(maxVX, player.vx));
+
+  player.x += player.vx * dt;
+  player.y += player.vy * dt;
+
+  // clamp to screen
+  player.x = Math.max(20, Math.min(W * .55, player.x));
+  player.y = Math.max(10, Math.min(H - player.h - 10, player.y));
+
+  // player trail
+  player.trail.push({ x: player.x + player.w/2, y: player.y + player.h/2, t: 1 });
+  if (player.trail.length > 16) player.trail.shift();
+  player.trail.forEach(t => t.t -= dt * 3);
+
+  // ── Spawn
+  spawnTimer += dtMs;
+  const lvCfg = LEVELS[Math.min(levelIdx, LEVELS.length-1)];
+  if (spawnTimer >= lvCfg.spawnMs) {
+    spawnObstacle(); spawnTimer = 0;
+  }
+
+  // ── Bullets
+  player.invincible = Math.max(0, player.invincible - dtMs);
+  for (let i = bullets.length - 1; i >= 0; i--) {
+    const b = bullets[i];
+    b.x += b.speed * dt;
+    // sparks on edge of bullet
+    if (Math.random() < 0.3) spawnParticle(b.x - 4, b.y, 'bullet-flash');
+    if (b.x > W + 20) { bullets.splice(i, 1); continue; }
+    // hit obstacles
+    let hit = false;
+    for (let j = obstacles.length - 1; j >= 0; j--) {
+      const o = obstacles[j];
+      if (!o.alive) continue;
+      if (rectsOverlap(b, o)) {
+        o.hp--;
+        for (let k = 0; k < 6; k++) spawnParticle(b.x, b.y, 'bullet-hit');
+        hit = true;
+        if (o.hp <= 0) {
+          o.alive = false;
+          kills++;
+          combo++;
+          bestCombo = Math.max(bestCombo, combo);
+          const pts = 10 * combo;
+          score += pts;
+          for (let k = 0; k < 14; k++) spawnParticle(o.x + o.w/2, o.y + o.h/2, 'explode', o.color);
+          spawnParticle(o.x + o.w/2, o.y - 10, 'score', pts);
+          showComboFlash();
+          obstacles.splice(j, 1);
+        }
+        break;
+      }
+    }
+    if (hit) { bullets.splice(i, 1); }
+  }
+
+  // ── Obstacles
+  for (let i = obstacles.length - 1; i >= 0; i--) {
+    const o = obstacles[i];
+    o.x -= o.speed * dt * 60;
+
+    // zigzag
+    if (o.type === 'zigzag') {
+      o.zig += o.zigFreq * 60 * dt;
+      o.y += Math.sin(o.zig) * o.zigDir * o.zigAmp * dt;
+    }
+    // homing – slowly steer toward player
+    if (o.type === 'homing') {
+      const dy = (player.y + player.h/2) - (o.y + o.h/2);
+      o.y += dy * 1.4 * dt;
+    }
+
+    // clamp vertically
+    o.y = Math.max(0, Math.min(H - o.h, o.y));
+
+    // off screen left
+    if (o.x + o.w < 0) {
+      obstacles.splice(i, 1);
+      combo = 1; // reset combo on miss
+      updateHUD();
+      continue;
+    }
+
+    // collision with player
+    if (player.invincible <= 0 && rectsOverlap(player, o)) {
+      hp--;
+      player.invincible = 1400; // ms
+      spawnExplosion(o.x, o.y, o.w, o.h, o.color);
+      obstacles.splice(i, 1);
+      combo = 1;
+      updateHUD();
+      if (hp <= 0) { showGameOver(); return; }
+    }
+  }
+
+  // ── Particles
+  for (let i = particles.length - 1; i >= 0; i--) {
+    const p = particles[i];
+    p.life -= dt * (p.kind === 'trail' ? 2.5 : p.kind === 'score' ? 1.0 : 3);
+    if (p.kind !== 'score') { p.x += p.vx; p.y += p.vy; }
+    else { p.x += p.vx; p.y += p.vy; }
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+
+  // ── Score tick
+  score += Math.floor(dt * 6 * (1 + levelIdx * 0.3));
+  updateHUD();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DRAW
+// ─────────────────────────────────────────────────────────────────────────────
+function draw() {
+  const W = CANVAS.width, H = CANVAS.height;
+
+  // Background
+  CTX.fillStyle = '#080C10';
+  CTX.fillRect(0, 0, W, H);
+
+  // Star field (static, cheap)
+  drawStars(W, H);
+
+  // Subtle speed lines
+  drawSpeedLines(W, H);
+
+  // Player trail
+  player.trail.forEach((t, i) => {
+    if (t.t <= 0) return;
+    const r = (i / player.trail.length) * 10 * t.t;
+    CTX.save();
+    CTX.globalAlpha = t.t * 0.35;
+    CTX.fillStyle = '#39FF14';
+    CTX.shadowBlur = 8; CTX.shadowColor = '#39FF14';
+    CTX.beginPath();
+    CTX.arc(t.x, t.y, r, 0, Math.PI * 2);
+    CTX.fill();
+    CTX.restore();
+  });
+
+  // Bullets
+  bullets.forEach(b => {
+    CTX.save();
+    CTX.shadowBlur = 14; CTX.shadowColor = '#00B4FF';
+    // gradient bolt
+    const grad = CTX.createLinearGradient(b.x - b.w, b.y, b.x, b.y);
+    grad.addColorStop(0, 'rgba(0,180,255,0)');
+    grad.addColorStop(1, '#00B4FF');
+    CTX.fillStyle = grad;
+    CTX.beginPath();
+    CTX.roundRect(b.x - b.w, b.y - b.h/2, b.w, b.h, 3);
+    CTX.fill();
+    CTX.restore();
+  });
+
+  // Obstacles
+  obstacles.forEach(o => {
+    CTX.save();
+    CTX.shadowBlur = 18; CTX.shadowColor = o.glow;
+    // body
+    const pct = o.hp / o.maxHp;
+    CTX.globalAlpha = 0.85 + pct * 0.15;
+    CTX.fillStyle = o.color;
+    CTX.beginPath();
+    const radius = o.type === 'big' ? 10 : o.type === 'homing' ? 999 : 6;
+    if (radius === 999) {
+      // diamond for homing
+      CTX.save();
+      CTX.translate(o.x + o.w/2, o.y + o.h/2);
+      CTX.rotate(Math.PI / 4);
+      CTX.fillRect(-o.w/2 * .7, -o.h/2 * .7, o.w * .7, o.h * .7);
+      CTX.restore();
+    } else {
+      CTX.roundRect(o.x, o.y, o.w, o.h, radius);
+      CTX.fill();
+    }
+    // HP bar for multi-hit
+    if (o.maxHp > 1) {
+      CTX.globalAlpha = 1;
+      CTX.shadowBlur = 0;
+      CTX.fillStyle = '#0E1419';
+      CTX.fillRect(o.x, o.y - 8, o.w, 5);
+      CTX.fillStyle = o.color;
+      CTX.fillRect(o.x, o.y - 8, o.w * pct, 5);
+    }
+    CTX.restore();
+  });
+
+  // Player
+  drawPlayer(W, H);
+
+  // Particles
+  particles.forEach(p => {
+    if (p.life <= 0) return;
+    CTX.save();
+    CTX.globalAlpha = p.life;
+    if (p.kind === 'score') {
+      CTX.font = 'bold 14px "Space Mono", monospace';
+      CTX.fillStyle = p.color;
+      CTX.shadowBlur = 8; CTX.shadowColor = p.color;
+      CTX.fillText(p.text, p.x, p.y);
+    } else {
+      CTX.shadowBlur = 12; CTX.shadowColor = p.color;
+      CTX.fillStyle = p.color;
+      CTX.beginPath();
+      CTX.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+      CTX.fill();
+    }
+    CTX.restore();
+  });
+}
+
+// ── Stars (simple deterministic pattern)
+let starSeeds = null;
+function drawStars(W, H) {
+  if (!starSeeds) {
+    starSeeds = [];
+    for (let i = 0; i < 80; i++) {
+      starSeeds.push({ x: Math.random(), y: Math.random(), r: .5 + Math.random() * 1.2, a: .1 + Math.random() * .4 });
+    }
+  }
+  CTX.save();
+  starSeeds.forEach(s => {
+    CTX.globalAlpha = s.a;
+    CTX.fillStyle = '#E8F4FD';
+    CTX.beginPath();
+    CTX.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+    CTX.fill();
+  });
+  CTX.restore();
+}
+
+// ── Speed lines
+let linePhase = 0;
+function drawSpeedLines(W, H) {
+  linePhase += 0.018;
+  CTX.save();
+  CTX.globalAlpha = 0.045;
+  CTX.strokeStyle = '#00B4FF';
+  CTX.lineWidth = 1;
+  for (let i = 0; i < 8; i++) {
+    const y = ((i / 8 + linePhase) % 1) * H;
+    const len = 60 + Math.sin(i * 1.3) * 40;
+    CTX.beginPath();
+    CTX.moveTo(W, y);
+    CTX.lineTo(W - len, y);
+    CTX.stroke();
+  }
+  CTX.restore();
+}
+
+// ── Player draw
+function drawPlayer(W, H) {
+  const p = player;
+  const cx = p.x + p.w/2, cy = p.y + p.h/2;
+
+  // invincibility flicker
+  if (p.invincible > 0 && Math.floor(p.invincible / 80) % 2 === 1) return;
+
+  CTX.save();
+
+  // Glow
+  CTX.shadowBlur = 22;
+  CTX.shadowColor = '#39FF14';
+
+  // Body – angular spaceship shape
+  CTX.fillStyle = '#39FF14';
+  CTX.beginPath();
+  CTX.moveTo(p.x + p.w,     cy);           // nose
+  CTX.lineTo(p.x + p.w*.55, p.y);          // top-front
+  CTX.lineTo(p.x + p.w*.1,  p.y + 4);     // top-back
+  CTX.lineTo(p.x,            cy);           // tail tip
+  CTX.lineTo(p.x + p.w*.1,  p.y + p.h - 4); // bottom-back
+  CTX.lineTo(p.x + p.w*.55, p.y + p.h);   // bottom-front
+  CTX.closePath();
+  CTX.fill();
+
+  // Cockpit tint
+  CTX.fillStyle = 'rgba(0,180,255,.5)';
+  CTX.beginPath();
+  CTX.ellipse(p.x + p.w * .6, cy, p.w * .16, p.h * .2, 0, 0, Math.PI*2);
+  CTX.fill();
+
+  // Engine glow (back)
+  const engGrad = CTX.createRadialGradient(p.x + 4, cy, 1, p.x + 4, cy, 14);
+  engGrad.addColorStop(0, 'rgba(57,255,20,.9)');
+  engGrad.addColorStop(.4, 'rgba(0,180,255,.5)');
+  engGrad.addColorStop(1, 'rgba(57,255,20,0)');
+  CTX.fillStyle = engGrad;
+  CTX.beginPath();
+  CTX.ellipse(p.x + 4, cy, 14, 7, 0, 0, Math.PI*2);
+  CTX.fill();
+
+  CTX.restore();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// UTILS
+// ─────────────────────────────────────────────────────────────────────────────
+function rectsOverlap(a, b) {
+  return a.x < b.x + b.w && a.x + a.w > b.x &&
+         a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// INITIAL SCREEN
+// ─────────────────────────────────────────────────────────────────────────────
+showTitle();
+
+// Animated title background
+(function titleLoop() {
+  if (state !== 'title' && state !== 'dead') return;
+  requestAnimationFrame(titleLoop);
+  const W = CANVAS.width, H = CANVAS.height;
+  CTX.fillStyle = 'rgba(8,12,16,.18)';
+  CTX.fillRect(0, 0, W, H);
+  if (!starSeeds) return;
+  starSeeds.forEach(s => {
+    CTX.globalAlpha = s.a * .5;
+    CTX.fillStyle = '#E8F4FD';
+    CTX.beginPath();
+    CTX.arc(s.x * W, s.y * H, s.r, 0, Math.PI*2);
+    CTX.fill();
+    CTX.globalAlpha = 1;
+  });
+  // Subtle ambient pulse
+  linePhase += 0.005;
+  CTX.save();
+  CTX.globalAlpha = 0.03;
+  CTX.strokeStyle = '#00B4FF';
+  CTX.lineWidth = 1;
+  for (let i = 0; i < 6; i++) {
+    const y = ((i / 6 + linePhase) % 1) * H;
+    CTX.beginPath(); CTX.moveTo(W, y); CTX.lineTo(W - 80, y); CTX.stroke();
+  }
+  CTX.restore();
+})();
+</script>
+</body>
+</html>
+SCRIPT_EOF
