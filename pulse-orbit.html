@@ -28,40 +28,90 @@
   }
   #game{display:block;width:100vw;height:100vh;}
 
+  .vignette{
+    position:fixed;inset:0;pointer-events:none;z-index:4;
+    background:radial-gradient(ellipse at 50% 62%, transparent 45%, rgba(0,0,0,.55) 100%);
+  }
+
   .hud{
     position:fixed;inset:0;pointer-events:none;
     display:flex;flex-direction:column;
     z-index:5;
   }
   .hud-top{
+    position:relative;
     display:flex;justify-content:space-between;align-items:flex-start;
-    padding:22px 24px;
+    padding:18px 18px;gap:12px;
   }
-  .score-block{display:flex;flex-direction:column;gap:2px;}
+  .hud-top::before{
+    content:'';position:absolute;inset:8px 8px auto 8px;height:92px;pointer-events:none;
+    border-radius:28px;
+    background:radial-gradient(circle at 15% 15%, rgba(0,229,255,.14), transparent 32%),
+               radial-gradient(circle at 85% 15%, rgba(255,45,149,.12), transparent 28%);
+    filter:blur(4px);
+  }
+  .hud-card{
+    background:linear-gradient(160deg, rgba(20,26,48,.62), rgba(8,10,20,.55));
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:18px;padding:12px 18px;
+    backdrop-filter:blur(10px);
+    box-shadow:0 6px 24px rgba(0,0,0,.4), inset 0 1px 0 rgba(255,255,255,.06);
+  }
+  .score-block{display:flex;flex-direction:column;gap:3px;min-width:132px;}
   .score-label{
-    font-size:11px;letter-spacing:.3em;color:var(--text-dim);font-weight:600;
+    font-size:10px;letter-spacing:.32em;color:var(--text-dim);font-weight:600;
   }
   .score-value{
-    font-family:'Orbitron',sans-serif;font-size:clamp(28px,6vw,42px);font-weight:700;
-    color:var(--text);text-shadow:0 0 18px rgba(0,229,255,.35);
+    font-family:'Orbitron',sans-serif;font-size:clamp(26px,6vw,40px);font-weight:700;
+    color:var(--text);text-shadow:0 0 18px rgba(0,229,255,.4);
     line-height:1;
   }
+  .level-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
   .level-badge{
-    align-self:flex-start;
-    font-family:'Orbitron',sans-serif;font-size:12px;letter-spacing:.2em;
+    font-family:'Orbitron',sans-serif;font-size:11px;letter-spacing:.18em;
     color:var(--bg-void);background:linear-gradient(135deg,var(--ring-inner),var(--ring-outer));
-    padding:6px 14px;border-radius:20px;font-weight:700;
-    box-shadow:0 0 20px rgba(0,229,255,.35);
+    padding:5px 12px;border-radius:20px;font-weight:700;white-space:nowrap;
+    box-shadow:0 0 16px rgba(0,229,255,.4);
   }
-  .combo-block{display:flex;flex-direction:column;align-items:flex-end;gap:2px;}
-  .combo-label{font-size:11px;letter-spacing:.3em;color:var(--text-dim);font-weight:600;}
+  .level-progress{
+    flex:1;height:6px;border-radius:6px;background:rgba(255,255,255,.08);
+    overflow:hidden;position:relative;
+  }
+  .level-progress-fill{
+    height:100%;border-radius:6px;width:0%;
+    background:linear-gradient(90deg,var(--ring-inner),var(--ring-outer));
+    box-shadow:0 0 10px rgba(0,229,255,.6);
+    transition:width .18s ease;
+  }
+
+  .combo-block{display:flex;flex-direction:column;align-items:flex-end;gap:3px;min-width:120px;}
+  .combo-label{font-size:10px;letter-spacing:.32em;color:var(--text-dim);font-weight:600;}
   .combo-value{
-    font-family:'Orbitron',sans-serif;font-size:clamp(22px,5vw,32px);font-weight:700;
+    font-family:'Orbitron',sans-serif;font-size:clamp(20px,5vw,30px);font-weight:700;
     color:var(--gold);text-shadow:0 0 16px rgba(255,210,63,.5);
     line-height:1;transition:transform .12s ease;
   }
   .combo-value.pulse{transform:scale(1.25);}
-  .best-line{font-size:12px;color:var(--text-dim);letter-spacing:.15em;margin-top:4px;}
+  .best-row{
+    display:flex;align-items:center;gap:5px;margin-top:6px;
+    font-size:13px;color:var(--gold);letter-spacing:.08em;font-weight:700;
+    font-family:'Orbitron',sans-serif;
+    transition:transform .18s ease, filter .18s ease;
+  }
+  .best-row svg{width:13px;height:13px;filter:drop-shadow(0 0 4px rgba(255,210,63,.7));}
+  .best-row.lead{color:#7dffb0;transform:scale(1.08);filter:drop-shadow(0 0 8px rgba(61,255,160,.6));}
+  .best-row.lead svg{filter:drop-shadow(0 0 6px rgba(61,255,160,.8));}
+
+  .best-line{
+    display:flex;align-items:center;gap:7px;
+    margin-top:4px;padding:8px 12px;border-radius:999px;
+    color:var(--gold);font-size:12px;letter-spacing:.16em;font-weight:700;
+    font-family:'Orbitron',sans-serif;
+    background:linear-gradient(160deg, rgba(255,210,63,.12), rgba(255,45,149,.08));
+    border:1px solid rgba(255,210,63,.18);
+    box-shadow:0 0 18px rgba(255,210,63,.1);
+  }
+  .best-line svg{width:14px;height:14px;filter:drop-shadow(0 0 4px rgba(255,210,63,.7));}
 
   .center-flash{
     position:absolute;top:14%;left:50%;transform:translate(-50%,0);
@@ -82,45 +132,95 @@
   .overlay{
     position:fixed;inset:0;z-index:10;
     display:flex;align-items:center;justify-content:center;
-    background:radial-gradient(circle at 50% 35%, rgba(15,20,40,.92), rgba(3,4,10,.97));
-    backdrop-filter:blur(2px);
+    background:radial-gradient(circle at 50% 35%, rgba(15,20,40,.94), rgba(3,4,10,.98));
+    backdrop-filter:blur(3px);
     text-align:center;
     transition:opacity .35s ease;
   }
   .overlay.hidden{opacity:0;pointer-events:none;}
-  .panel{display:flex;flex-direction:column;align-items:center;gap:18px;padding:20px;max-width:420px;}
+  .panel{
+    display:flex;flex-direction:column;align-items:center;gap:16px;
+    padding:32px 28px;max-width:440px;
+    border:1px solid rgba(255,255,255,.08);
+    border-radius:28px;
+    background:linear-gradient(160deg, rgba(18,22,42,.5), rgba(6,8,16,.35));
+    box-shadow:0 20px 60px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.06);
+  }
   .title{
     font-family:'Orbitron',sans-serif;font-weight:900;
-    font-size:clamp(34px,9vw,56px);letter-spacing:.08em;
+    font-size:clamp(34px,9vw,58px);letter-spacing:.08em;
     background:linear-gradient(120deg,var(--ring-inner),var(--gem) 45%,var(--ring-outer));
     -webkit-background-clip:text;background-clip:text;color:transparent;
-    filter:drop-shadow(0 0 24px rgba(0,229,255,.35));
+    filter:drop-shadow(0 0 24px rgba(0,229,255,.4));
+    animation:titleBreathe 3.2s ease-in-out infinite;
   }
-  .subtitle{color:var(--text-dim);font-size:15px;letter-spacing:.08em;line-height:1.5;max-width:340px;}
+  @keyframes titleBreathe{
+    0%,100%{filter:drop-shadow(0 0 22px rgba(0,229,255,.35));}
+    50%{filter:drop-shadow(0 0 40px rgba(255,45,149,.55));}
+  }
+  .subtitle{color:var(--text-dim);font-size:15px;letter-spacing:.08em;line-height:1.55;max-width:340px;}
   .subtitle b{color:var(--text);font-weight:700;}
+
+  .best-chip{
+    display:flex;align-items:center;gap:8px;
+    padding:8px 18px;border-radius:30px;
+    background:rgba(255,210,63,.08);
+    border:1px solid rgba(255,210,63,.3);
+    color:var(--gold);font-family:'Orbitron',sans-serif;font-size:13px;letter-spacing:.12em;font-weight:700;
+    box-shadow:0 0 20px rgba(255,210,63,.15);
+  }
+  .best-chip svg{width:16px;height:16px;filter:drop-shadow(0 0 5px rgba(255,210,63,.7));}
+
   .btn{
+    position:relative;overflow:hidden;
     font-family:'Orbitron',sans-serif;font-weight:700;letter-spacing:.12em;
     font-size:16px;color:var(--bg-void);
     background:linear-gradient(135deg,var(--ring-inner),var(--ring-outer));
-    border:none;padding:16px 40px;border-radius:40px;cursor:pointer;
+    border:none;padding:17px 44px;border-radius:40px;cursor:pointer;
     box-shadow:0 0 30px rgba(0,229,255,.4),0 8px 20px rgba(0,0,0,.4);
     pointer-events:all;
+    animation:btnPulse 2.4s ease-in-out infinite;
     transition:transform .15s ease, box-shadow .15s ease;
   }
-  .btn:hover{transform:translateY(-2px) scale(1.03);box-shadow:0 0 40px rgba(255,45,149,.5);}
+  .btn::after{
+    content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;
+    background:linear-gradient(120deg, transparent, rgba(255,255,255,.55), transparent);
+    transform:skewX(-20deg);
+    animation:btnShine 2.6s ease-in-out infinite;
+  }
+  @keyframes btnShine{
+    0%{left:-60%;} 35%{left:130%;} 100%{left:130%;}
+  }
+  @keyframes btnPulse{
+    0%,100%{box-shadow:0 0 30px rgba(0,229,255,.4),0 8px 20px rgba(0,0,0,.4);}
+    50%{box-shadow:0 0 46px rgba(255,45,149,.55),0 8px 24px rgba(0,0,0,.4);}
+  }
+  .btn:hover{transform:translateY(-2px) scale(1.03);}
   .btn:active{transform:translateY(0) scale(.97);}
-  .stat-row{display:flex;gap:34px;margin-top:2px;}
+  .stat-row{display:flex;gap:30px;margin-top:2px;}
   .stat{display:flex;flex-direction:column;align-items:center;gap:2px;}
-  .stat-num{font-family:'Orbitron',sans-serif;font-size:30px;font-weight:700;color:var(--text);}
-  .stat-num.gold{color:var(--gold);}
+  .stat-num{font-family:'Orbitron',sans-serif;font-size:32px;font-weight:700;color:var(--text);}
+  .stat-num.gold{color:var(--gold);text-shadow:0 0 16px rgba(255,210,63,.5);}
   .stat-cap{font-size:11px;letter-spacing:.25em;color:var(--text-dim);}
   .hint{font-size:12px;color:var(--text-dim);letter-spacing:.1em;margin-top:2px;}
-  .newbest{color:var(--gold);font-size:13px;letter-spacing:.2em;font-weight:700;opacity:0;height:16px;}
-  .newbest.show{opacity:1;}
+  .newbest{
+    display:flex;align-items:center;gap:8px;
+    color:var(--bg-void);font-size:13px;letter-spacing:.2em;font-weight:700;
+    font-family:'Orbitron',sans-serif;
+    background:linear-gradient(135deg,var(--gold),#fff3c4);
+    padding:8px 18px;border-radius:24px;
+    box-shadow:0 0 26px rgba(255,210,63,.6);
+    opacity:0;transform:scale(.85);height:0;overflow:hidden;
+    transition:opacity .3s ease, transform .3s ease;
+  }
+  .newbest svg{width:14px;height:14px;}
+  .newbest.show{opacity:1;transform:scale(1);height:auto;padding:8px 18px;}
 
   @media (prefers-reduced-motion: reduce){
     .center-flash.show{animation:none;opacity:1;}
-    .btn{transition:none;}
+    .btn{transition:none;animation:none;}
+    .btn::after{animation:none;display:none;}
+    .title{animation:none;}
   }
 </style>
 </head>
@@ -133,12 +233,15 @@
     <div class="score-block">
       <div class="score-label">SCORE</div>
       <div class="score-value" id="scoreVal">0</div>
-      <div class="level-badge" id="levelBadge">LEVEL 1</div>
+      <div class="level-row">
+        <div class="level-badge" id="levelBadge">LEVEL 1</div>
+        <div class="level-progress"><div class="level-progress-fill" id="levelProgressFill"></div></div>
+      </div>
     </div>
     <div class="combo-block">
       <div class="combo-label">COMBO</div>
       <div class="combo-value" id="comboVal">×1</div>
-      <div class="best-line" id="bestLine">BEST 0</div>
+      <div class="best-line" id="bestLine"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.8.9-4.9 4.7 1.2 6.7L12 17.8 6 20.5l1.2-6.7L2.3 9.1l6.8-.9L12 2z"/></svg><span id="bestLineText">BEST 0</span></div>
     </div>
   </div>
   <div class="center-flash" id="centerFlash"></div>
@@ -148,6 +251,7 @@
   <div class="panel">
     <div class="title">PULSE&nbsp;ORBIT</div>
     <div class="subtitle">Kreise um das Zentrum. <b>Tippe / Klicke / Leertaste</b>, um zwischen innerer und äußerer Bahn zu wechseln — weiche den Wällen aus, sammle die Kristalle.</div>
+    <div class="best-chip" id="menuBestChip"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l2.9 6.2 6.8.9-4.9 4.7 1.2 6.7L12 17.8 6 20.5l1.2-6.7L2.3 9.1l6.8-.9L12 2z"/></svg><span id="menuBestVal">BEST 0</span></div>
     <button class="btn" id="startBtn">STARTEN</button>
     <div class="hint">Unendlich viele Level · wird stetig schneller</div>
   </div>
@@ -167,6 +271,7 @@
   </div>
 </div>
 
+
 <script>
 (function(){
   "use strict";
@@ -174,84 +279,122 @@
   // ---------- Canvas setup ----------
   const canvas = document.getElementById('game');
   const ctx = canvas.getContext('2d');
-  let W=0,H=0,DPR=1,cx=0,cy=0,outerR=0,innerR=0,ringThickness=0;
-  let anchorX=0, anchorY=0; // fixed screen point the player always renders at (camera follows)
+  let W = 0, H = 0, DPR = 1;
+  let screenCX = 0, screenCY = 0;
+  let arenaCX = 0, arenaCY = 0;
+  let outerR = 0, innerR = 0, ringThickness = 0;
 
   function resize(){
-    DPR = Math.min(window.devicePixelRatio||1, 2.5);
-    W = window.innerWidth; H = window.innerHeight;
-    canvas.width = W*DPR; canvas.height = H*DPR;
-    canvas.style.width = W+'px'; canvas.style.height = H+'px';
-    ctx.setTransform(DPR,0,0,DPR,0,0);
-    cx = W/2; cy = H*0.54;
-    const base = Math.min(W,H);
-    outerR = base*0.33;
-    innerR = base*0.205;
-    ringThickness = Math.max(4, base*0.014);
-    anchorX = W/2;
-    anchorY = H*0.70;
+    DPR = Math.min(window.devicePixelRatio || 1, 2.5);
+    W = window.innerWidth;
+    H = window.innerHeight;
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+
+    screenCX = W * 0.5;
+    screenCY = H * 0.5;
+    arenaCX = W * 0.5;
+    arenaCY = H * 0.54;
+
+    const base = Math.min(W, H);
+    outerR = base * 0.41;
+    innerR = base * 0.26;
+    ringThickness = Math.max(4, base * 0.014);
+
+    if(state){
+      state.cameraX = arenaCX;
+      state.cameraY = arenaCY;
+      state.zoomCurrent = Math.max(state.zoomCurrent || 1.2, 1.2);
+    }
   }
   window.addEventListener('resize', resize);
-  resize();
 
-  const TWO_PI = Math.PI*2;
-  function lerp(a,b,t){ return a+(b-a)*t; }
-  function lerpColor(hexA,hexB,t){
-    const pa=[parseInt(hexA.slice(1,3),16),parseInt(hexA.slice(3,5),16),parseInt(hexA.slice(5,7),16)];
-    const pb=[parseInt(hexB.slice(1,3),16),parseInt(hexB.slice(3,5),16),parseInt(hexB.slice(5,7),16)];
-    const r=Math.round(lerp(pa[0],pb[0],t)),g=Math.round(lerp(pa[1],pb[1],t)),b=Math.round(lerp(pa[2],pb[2],t));
+  const TWO_PI = Math.PI * 2;
+  function lerp(a, b, t){ return a + (b - a) * t; }
+  function clamp(v, a, b){ return Math.max(a, Math.min(b, v)); }
+  function easeInOut(t){ return t * t * (3 - 2 * t); }
+  function lerpColor(hexA, hexB, t){
+    const pa = [parseInt(hexA.slice(1,3),16), parseInt(hexA.slice(3,5),16), parseInt(hexA.slice(5,7),16)];
+    const pb = [parseInt(hexB.slice(1,3),16), parseInt(hexB.slice(3,5),16), parseInt(hexB.slice(5,7),16)];
+    const r = Math.round(lerp(pa[0], pb[0], t));
+    const g = Math.round(lerp(pa[1], pb[1], t));
+    const b = Math.round(lerp(pa[2], pb[2], t));
     return `rgb(${r},${g},${b})`;
   }
 
+  function worldToScreen(x, y, cam){
+    return {
+      x: (x - cam.x) * state.zoomCurrent + screenCX,
+      y: (y - cam.y) * state.zoomCurrent + screenCY
+    };
+  }
+
+  function pointOnRing(centerX, centerY, radius, angle){
+    return {
+      x: centerX + Math.cos(angle) * radius,
+      y: centerY + Math.sin(angle) * radius
+    };
+  }
+
   // ---------- Audio (WebAudio synth, no assets) ----------
-  let actx=null;
+  let actx = null;
   function ensureAudio(){
     if(!actx){
-      try{ actx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){}
-    } else if(actx.state==='suspended'){ actx.resume(); }
+      try{ actx = new (window.AudioContext || window.webkitAudioContext)(); }catch(e){}
+    } else if(actx.state === 'suspended'){
+      actx.resume();
+    }
   }
-  function tone(freq,dur,type,peak,delay){
+  function tone(freq, dur, type, peak, delay){
     if(!actx) return;
-    const t0 = actx.currentTime + (delay||0);
+    const t0 = actx.currentTime + (delay || 0);
     const osc = actx.createOscillator();
     const gain = actx.createGain();
-    osc.type = type||'sine';
+    osc.type = type || 'sine';
     osc.frequency.setValueAtTime(freq, t0);
     gain.gain.setValueAtTime(0, t0);
-    gain.gain.linearRampToValueAtTime(peak!=null?peak:0.18, t0+0.012);
-    gain.gain.exponentialRampToValueAtTime(0.0001, t0+dur);
-    osc.connect(gain); gain.connect(actx.destination);
-    osc.start(t0); osc.stop(t0+dur+0.02);
+    gain.gain.linearRampToValueAtTime(peak != null ? peak : 0.18, t0 + 0.012);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+    osc.connect(gain);
+    gain.connect(actx.destination);
+    osc.start(t0);
+    osc.stop(t0 + dur + 0.02);
   }
-  function playSwitch(){ tone(520,0.09,'triangle',0.16); }
-  function playGem(comboMult){ tone(720+comboMult*40,0.14,'sine',0.22); tone(1080+comboMult*40,0.14,'sine',0.12,0.03); }
-  function playPass(){ tone(300,0.05,'sine',0.05); }
+  function playSwitch(){ tone(520, 0.09, 'triangle', 0.16); }
+  function playGem(comboMult){ tone(720 + comboMult * 40, 0.14, 'sine', 0.22); tone(1080 + comboMult * 40, 0.14, 'sine', 0.12, 0.03); }
+  function playPass(){ tone(300, 0.05, 'sine', 0.05); }
   function playHit(){
     if(!actx) return;
     const t0 = actx.currentTime;
     const osc = actx.createOscillator();
     const gain = actx.createGain();
-    osc.type='sawtooth';
-    osc.frequency.setValueAtTime(220,t0);
-    osc.frequency.exponentialRampToValueAtTime(40,t0+0.35);
-    gain.gain.setValueAtTime(0.28,t0);
-    gain.gain.exponentialRampToValueAtTime(0.0001,t0+0.4);
-    osc.connect(gain); gain.connect(actx.destination);
-    osc.start(t0); osc.stop(t0+0.42);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(220, t0);
+    osc.frequency.exponentialRampToValueAtTime(40, t0 + 0.35);
+    gain.gain.setValueAtTime(0.28, t0);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.4);
+    osc.connect(gain);
+    gain.connect(actx.destination);
+    osc.start(t0);
+    osc.stop(t0 + 0.42);
   }
-  function playLevelUp(){
-    [0,0.09,0.18].forEach((d,i)=>tone(440+i*220,0.22,'triangle',0.16,d));
-  }
+  function playLevelUp(){ [0, 0.09, 0.18].forEach((d, i) => tone(440 + i * 220, 0.22, 'triangle', 0.16, d)); }
 
   // ---------- Game state ----------
   const state = {
-    mode: 'start', // start | playing | over
-    playerAngle: -Math.PI/2, // continuous, unbounded
-    playerRing: 0, // 0 = inner, 1 = outer
+    mode: 'start',
+    playerAngle: -Math.PI / 2,
+    prevPlayerAngle: -Math.PI / 2,
+    playerRing: 0,
     angularSpeed: 1.05,
-    obstacles: [], // {angle, width, ring, resolved}
-    gems: [],      // {angle, ring, taken}
-    nextSpawnAngle: -Math.PI/2 + 1.4,
+    obstacles: [],
+    gems: [],
+    nextSpawnAngle: -Math.PI / 2 + 1.4,
+    lastSpawnRing: null,
+    lastSpawnAngle: -999,
     obstaclesPassed: 0,
     obstaclesSinceLevel: 0,
     level: 1,
@@ -263,77 +406,86 @@
     particles: [],
     stars: [],
     sinceStart: 0,
-    ringSwitchLock: false,
-    animRingT: 0,   // smoothed 0..1 interpolation between inner(0)/outer(1) for camera + visuals
-    zoomCurrent: 1  // smoothed world zoom, grows with level
+    animRingT: 0,
+    zoomCurrent: 1.2,
+    cameraX: 0,
+    cameraY: 0
   };
 
-  for(let i=0;i<130;i++){
+  for(let i = 0; i < 130; i++){
     state.stars.push({
-      a: Math.random()*TWO_PI,
-      r: 0.05+Math.random()*0.98,
-      size: Math.random()*1.6+0.4,
-      tw: Math.random()*TWO_PI
+      a: Math.random() * TWO_PI,
+      r: 0.05 + Math.random() * 0.98,
+      size: Math.random() * 1.6 + 0.4,
+      tw: Math.random() * TWO_PI
     });
   }
 
-  const RING_COLOR = ['#00e5ff','#ff2d95'];
-  const RING_COLOR_RGB = ['0,229,255','255,45,149'];
+  const RING_COLOR = ['#00e5ff', '#ff2d95'];
+  const RING_COLOR_RGB = ['0,229,255', '255,45,149'];
 
-  function ringRadius(ring){ return ring===0 ? innerR : outerR; }
-  function effRingRadius(ring){ return ringRadius(ring)*state.zoomCurrent; }
+  function ringRadius(ring){ return ring === 0 ? innerR : outerR; }
+  function effRingRadius(ring){ return ringRadius(ring) * state.zoomCurrent; }
+  function comboMultiplier(){ return 1 + Math.min(4, Math.floor(state.combo / 5)); }
 
-  // Camera keeps the player pinned at the fixed anchor point; the world (rings,
-  // obstacles, gems) is drawn relative to a shifting virtual center so only a
-  // window of the — now much bigger — circle is ever visible.
-  function computeCamera(){
-    const animR = lerp(effRingRadius(0), effRingRadius(1), state.animRingT);
-    const vcx = anchorX - Math.cos(state.playerAngle)*animR;
-    const vcy = anchorY - Math.sin(state.playerAngle)*animR;
-    return { vcx, vcy };
+  function playerWorldPos(){
+    const radius = effRingRadius(state.playerRing);
+    return pointOnRing(arenaCX, arenaCY, radius, state.playerAngle);
+  }
+
+  function targetCamera(){
+    const p = playerWorldPos();
+    const leadY = (H * 0.12) / Math.max(1, state.zoomCurrent);
+    return {
+      x: p.x,
+      y: p.y - leadY
+    };
+  }
+
+  function updateCamera(dt){
+    const target = targetCamera();
+    const speed = state.mode === 'playing' ? 8.5 : 5.2;
+    const t = 1 - Math.exp(-speed * dt);
+    state.cameraX += (target.x - state.cameraX) * t;
+    state.cameraY += (target.y - state.cameraY) * t;
   }
 
   // ---------- Difficulty curve ----------
-  // Progress 0..1 across levels: slow ramp early, steep ramp later (eased power curve).
   function levelProgress(level){
-    const t = Math.max(0, level-1) / 32; // reaches 1.0 around level ~33
-    return Math.min(1, Math.pow(t, 1.7));
+    const t = Math.max(0, level - 1) / 30;
+    return Math.min(1, easeInOut(t));
   }
-  const SPEED_START = 0.82, SPEED_MAX = 3.55;
-  const REACTION_START = 1.65, REACTION_MIN = 0.46;
-  const WIDTH_START = 0.46, WIDTH_MIN = 0.24;
-  const ZOOM_START = 1.0, ZOOM_MAX = 2.6;
+  const SPEED_START = 0.82, SPEED_MAX = 3.45;
+  const REACTION_START = 1.9, REACTION_MIN = 0.58;
+  const WIDTH_START = 0.42, WIDTH_MIN = 0.22;
+  const ZOOM_START = 1.25, ZOOM_MAX = 2.45;
 
   function computeDifficulty(){
     const p = levelProgress(state.level);
-    state.angularSpeed = SPEED_START + (SPEED_MAX-SPEED_START)*p;
+    state.angularSpeed = SPEED_START + (SPEED_MAX - SPEED_START) * p;
   }
   function reactionTime(){
     const p = levelProgress(state.level);
-    return REACTION_START - (REACTION_START-REACTION_MIN)*p;
+    return REACTION_START - (REACTION_START - REACTION_MIN) * p;
   }
   function obstacleWidth(){
     const p = levelProgress(state.level);
-    return WIDTH_START - (WIDTH_START-WIDTH_MIN)*Math.min(1,p*1.1);
+    return WIDTH_START - (WIDTH_START - WIDTH_MIN) * Math.min(1, p * 1.1);
   }
   function targetZoom(){
-    // grows a little slower than speed so the very first levels still show the whole ring
-    const t = Math.max(0, state.level-1) / 26;
-    const p = Math.min(1, Math.pow(t,1.5));
-    return ZOOM_START + (ZOOM_MAX-ZOOM_START)*p;
+    const p = levelProgress(state.level);
+    return ZOOM_START + (ZOOM_MAX - ZOOM_START) * p;
   }
 
-  // Obstacles needed to clear each level — gentle early, gently longer later too,
-  // so early levels come fast (hooks the player) and later ones feel earned.
   function obstaclesNeededForLevel(level){
-    return 7 + Math.floor(level/6)*2;
+    return 7 + Math.floor(level / 6) * 2;
   }
   function maybeLevelUp(){
     if(state.obstaclesSinceLevel >= obstaclesNeededForLevel(state.level)){
       state.obstaclesSinceLevel = 0;
       state.level += 1;
       computeDifficulty();
-      flashCenter('LEVEL '+state.level);
+      flashCenter('LEVEL ' + state.level);
       playLevelUp();
       state.shake = Math.max(state.shake, 6);
     }
@@ -341,44 +493,59 @@
 
   // ---------- Spawning ----------
   function spawnAhead(){
-    const lookahead = 3.0;
+    const lead = Math.max(1.35, state.angularSpeed * reactionTime() * 1.55);
+    const lookahead = Math.max(4.1, lead * 3.25);
     while(state.nextSpawnAngle < state.playerAngle + lookahead){
-      const width = obstacleWidth() * (0.9+Math.random()*0.25);
-      const ring = Math.random() < 0.5 ? 0 : 1;
-      const isBreather = (state.obstaclesPassed>0 && state.obstaclesPassed % 9 === 0);
+      const width = obstacleWidth() * (0.72 + Math.random() * 0.22);
+      let ring;
+      if(state.lastSpawnRing == null){
+        ring = Math.random() < 0.5 ? 0 : 1;
+      } else {
+        ring = Math.random() < 0.84 ? 1 - state.lastSpawnRing : state.lastSpawnRing;
+      }
+
+      const minAngle = Math.max(state.nextSpawnAngle, state.playerAngle + lead);
+      const gapToPrevious = minAngle - state.lastSpawnAngle;
+      const minimumSeparation = Math.max(width * 2.8, state.angularSpeed * reactionTime() * 1.75);
+      const angle = Math.max(minAngle, state.lastSpawnAngle + minimumSeparation);
 
       state.obstacles.push({
-        angle: state.nextSpawnAngle,
-        width: width,
-        ring: ring,
+        angle,
+        width,
+        ring,
         resolved: false
       });
 
-      // gem on the opposite (safe) ring, same slot, most of the time
-      if(Math.random() < 0.5){
+      if(Math.random() < 0.62){
         state.gems.push({
-          angle: state.nextSpawnAngle + width/2,
-          ring: 1-ring,
+          angle: angle + width * 0.55,
+          ring: 1 - ring,
           taken: false
         });
       }
 
-      const baseGap = state.angularSpeed * reactionTime();
-      const jitter = 0.85 + Math.random()*0.3;
-      const gap = isBreather ? baseGap*1.7 : baseGap*jitter;
-      state.nextSpawnAngle += Math.max(gap, width*1.8);
+      const baseGap = Math.max(state.angularSpeed * reactionTime() * 1.45, width * 2.9);
+      const jitter = 0.92 + Math.random() * 0.32;
+      const gap = baseGap * jitter;
+      state.nextSpawnAngle = angle + gap;
+      state.lastSpawnRing = ring;
+      state.lastSpawnAngle = angle;
     }
   }
 
   // ---------- Particles ----------
-  function burst(x,y,color,count,speed,life){
-    for(let i=0;i<count;i++){
-      const a = Math.random()*TWO_PI;
-      const s = (0.4+Math.random()*0.8)*speed;
+  function burst(x, y, color, count, speed, life){
+    for(let i = 0; i < count; i++){
+      const a = Math.random() * TWO_PI;
+      const s = (0.4 + Math.random() * 0.8) * speed;
       state.particles.push({
-        x,y, vx:Math.cos(a)*s, vy:Math.sin(a)*s,
-        life: life*(0.7+Math.random()*0.6), maxLife: life,
-        color, size: 1.5+Math.random()*2.5
+        x, y,
+        vx: Math.cos(a) * s,
+        vy: Math.sin(a) * s,
+        life: life * (0.7 + Math.random() * 0.6),
+        maxLife: life,
+        color,
+        size: 1.5 + Math.random() * 2.5
       });
     }
   }
@@ -386,26 +553,22 @@
   function flashCenter(text){
     const el = document.getElementById('centerFlash');
     el.textContent = text;
-    el.classList.remove('show'); void el.offsetWidth;
+    el.classList.remove('show');
+    void el.offsetWidth;
     el.classList.add('show');
   }
 
   // ---------- Input ----------
+  function playerPosForFX(){
+    return playerWorldPos();
+  }
   function switchRing(){
     if(state.mode !== 'playing') return;
     state.playerRing = 1 - state.playerRing;
     state.switchFlash = 1;
     playSwitch();
-    const p = playerPos();
-    burst(p.x,p.y, RING_COLOR_RGB[state.playerRing], 12, 100, 0.45);
-  }
-
-  // Player always renders at the fixed camera anchor — the world moves around it.
-  function playerPos(){
-    return { x: anchorX, y: anchorY };
-  }
-  function transitionAmount(){
-    return Math.abs(state.playerRing - state.animRingT);
+    const p = playerPosForFX();
+    burst(p.x, p.y, RING_COLOR_RGB[state.playerRing], 12, 100, 0.45);
   }
 
   function handlePrimaryInput(){
@@ -415,28 +578,40 @@
     switchRing();
   }
 
-  window.addEventListener('keydown', (e)=>{
-    if(e.code==='Space'||e.code==='ArrowUp'||e.code==='ArrowDown'||e.code==='KeyW'||e.code==='KeyS'){
+  window.addEventListener('keydown', (e) => {
+    if(e.code === 'Space' || e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'KeyW' || e.code === 'KeyS'){
       e.preventDefault();
       handlePrimaryInput();
     }
-  }, {passive:false});
-  canvas.addEventListener('pointerdown', (e)=>{ e.preventDefault(); handlePrimaryInput(); }, {passive:false});
-  document.getElementById('startBtn').addEventListener('click', (e)=>{ e.stopPropagation(); ensureAudio(); startGame(); });
-  document.getElementById('retryBtn').addEventListener('click', (e)=>{ e.stopPropagation(); ensureAudio(); startGame(); });
+  }, { passive: false });
+  canvas.addEventListener('pointerdown', (e) => { e.preventDefault(); handlePrimaryInput(); }, { passive: false });
+  document.getElementById('startBtn').addEventListener('click', (e) => { e.stopPropagation(); ensureAudio(); startGame(); });
+  document.getElementById('retryBtn').addEventListener('click', (e) => { e.stopPropagation(); ensureAudio(); startGame(); });
 
-  document.addEventListener('visibilitychange', ()=>{
-    if(document.hidden && state.mode==='playing'){ lastTime = null; }
+  document.addEventListener('visibilitychange', () => {
+    if(document.hidden && state.mode === 'playing'){
+      lastTime = null;
+    }
   });
 
   // ---------- Game flow ----------
+  function updateBestDisplay(){
+    const bestNow = Math.floor(Math.max(state.best, state.score));
+    document.getElementById('bestLineText').textContent = 'BEST ' + bestNow;
+    document.getElementById('menuBestVal').textContent = 'BEST ' + bestNow;
+    document.getElementById('finalBest').textContent = state.best;
+  }
+
   function startGame(){
     state.mode = 'playing';
-    state.playerAngle = -Math.PI/2;
+    state.playerAngle = -Math.PI / 2;
+    state.prevPlayerAngle = state.playerAngle;
     state.playerRing = 0;
     state.obstacles = [];
     state.gems = [];
-    state.nextSpawnAngle = -Math.PI/2 + 1.6;
+    state.nextSpawnAngle = -Math.PI / 2 + 1.8;
+    state.lastSpawnRing = null;
+    state.lastSpawnAngle = -999;
     state.obstaclesPassed = 0;
     state.obstaclesSinceLevel = 0;
     state.level = 1;
@@ -445,12 +620,16 @@
     state.particles = [];
     state.sinceStart = 0;
     state.animRingT = 0;
-    state.zoomCurrent = 1;
+    state.zoomCurrent = 1.25;
+    state.cameraX = arenaCX;
+    state.cameraY = arenaCY;
     computeDifficulty();
     spawnAhead();
     document.getElementById('startOverlay').classList.add('hidden');
     document.getElementById('overOverlay').classList.add('hidden');
+    document.getElementById('newBestTag').classList.remove('show');
     updateHUD();
+    updateBestDisplay();
     lastTime = null;
   }
 
@@ -459,8 +638,8 @@
     state.mode = 'over';
     playHit();
     state.shake = 18;
-    const p = playerPos();
-    burst(p.x,p.y,'255,80,80', 34, 170, 0.85);
+    const p = playerPosForFX();
+    burst(p.x, p.y, '255,80,80', 34, 170, 0.85);
 
     if(state.score > state.best){
       state.best = state.score;
@@ -471,18 +650,20 @@
     document.getElementById('finalScore').textContent = state.score;
     document.getElementById('finalLevel').textContent = state.level;
     document.getElementById('finalBest').textContent = state.best;
-    setTimeout(()=>{ document.getElementById('overOverlay').classList.remove('hidden'); }, 420);
+    updateBestDisplay();
+    setTimeout(() => { document.getElementById('overOverlay').classList.remove('hidden'); }, 420);
   }
 
   function updateHUD(){
     document.getElementById('scoreVal').textContent = Math.floor(state.score);
-    document.getElementById('levelBadge').textContent = 'LEVEL '+state.level;
-    const mult = comboMultiplier();
+    document.getElementById('levelBadge').textContent = 'LEVEL ' + state.level;
     const comboEl = document.getElementById('comboVal');
-    comboEl.textContent = '×'+mult;
-    document.getElementById('bestLine').textContent = 'BEST '+Math.floor(Math.max(state.best,state.score));
+    comboEl.textContent = '×' + comboMultiplier();
+
+    const progress = Math.min(1, state.obstaclesSinceLevel / Math.max(1, obstaclesNeededForLevel(state.level)));
+    document.getElementById('levelProgressFill').style.width = (progress * 100).toFixed(1) + '%';
+    updateBestDisplay();
   }
-  function comboMultiplier(){ return 1+Math.min(4, Math.floor(state.combo/5)); }
 
   // ---------- Update loop ----------
   let lastTime = null;
@@ -490,19 +671,24 @@
 
   function update(dt){
     state.sinceStart += dt;
-    state.playerAngle += state.angularSpeed*dt;
+    state.prevPlayerAngle = state.playerAngle;
+    state.playerAngle += state.angularSpeed * dt;
     spawnAhead();
 
-    // collisions with obstacles
+    const sweepStart = Math.min(state.prevPlayerAngle, state.playerAngle) - MARGIN;
+    const sweepEnd = Math.max(state.prevPlayerAngle, state.playerAngle) + MARGIN;
+
     for(const o of state.obstacles){
       if(o.resolved) continue;
       const start = o.angle - MARGIN;
       const end = o.angle + o.width + MARGIN;
-      if(o.ring === state.playerRing && state.playerAngle >= start && state.playerAngle <= end){
+
+      if(o.ring === state.playerRing && sweepEnd >= start && sweepStart <= end){
         o.resolved = true;
         endGame();
         return;
       }
+
       if(state.playerAngle > end){
         o.resolved = true;
         if(o.ring !== state.playerRing){
@@ -514,49 +700,55 @@
         }
       }
     }
-    // cleanup
-    if(state.obstacles.length > 40){
-      state.obstacles = state.obstacles.filter(o=>o.angle+o.width > state.playerAngle-1.5);
+
+    if(state.obstacles.length > 48){
+      state.obstacles = state.obstacles.filter(o => o.angle + o.width > state.playerAngle - 1.6);
     }
 
-    // gems
     for(const g of state.gems){
       if(g.taken) continue;
       const d = Math.abs(state.playerAngle - g.angle);
-      if(g.ring === state.playerRing && d < MARGIN+0.05){
+      if(g.ring === state.playerRing && d < MARGIN + 0.05){
         g.taken = true;
         state.combo++;
         const mult = comboMultiplier();
-        state.score += 8*mult;
+        state.score += 8 * mult;
         playGem(mult);
-        const cam = computeCamera();
-        const gr = effRingRadius(g.ring);
-        const gp = { x: cam.vcx+Math.cos(g.angle)*gr, y: cam.vcy+Math.sin(g.angle)*gr };
-        burst(gp.x,gp.y,'61,255,160',14,120,0.55);
+        const gp = pointOnRing(arenaCX, arenaCY, effRingRadius(g.ring), g.angle);
+        burst(gp.x, gp.y, '61,255,160', 14, 120, 0.55);
         const comboEl = document.getElementById('comboVal');
-        comboEl.classList.remove('pulse'); void comboEl.offsetWidth; comboEl.classList.add('pulse');
+        comboEl.classList.remove('pulse');
+        void comboEl.offsetWidth;
+        comboEl.classList.add('pulse');
       } else if(state.playerAngle - g.angle > 0.3){
-        if(!g.taken){ g.taken = true; state.combo = 0; }
+        if(!g.taken){
+          g.taken = true;
+          state.combo = 0;
+        }
       }
     }
-    if(state.gems.length > 40){
-      state.gems = state.gems.filter(g=>g.angle > state.playerAngle-1.5);
+
+    if(state.gems.length > 48){
+      state.gems = state.gems.filter(g => g.angle > state.playerAngle - 1.6);
     }
 
-    // smooth camera: zoom grows toward its per-level target, ring transition eases toward the active ring
-    state.zoomCurrent += (targetZoom() - state.zoomCurrent) * Math.min(1, dt*2.2);
-    state.animRingT += (state.playerRing - state.animRingT) * Math.min(1, dt*13);
+    const zoomTarget = targetZoom();
+    state.zoomCurrent += (zoomTarget - state.zoomCurrent) * Math.min(1, dt * 2.6);
+    state.animRingT += (state.playerRing - state.animRingT) * Math.min(1, dt * 13);
 
-    // particles
+    updateCamera(dt);
+
     for(const pt of state.particles){
-      pt.x += pt.vx*dt; pt.y += pt.vy*dt;
-      pt.vx *= (1-3.2*dt); pt.vy *= (1-3.2*dt);
+      pt.x += pt.vx * dt;
+      pt.y += pt.vy * dt;
+      pt.vx *= (1 - 3.2 * dt);
+      pt.vy *= (1 - 3.2 * dt);
       pt.life -= dt;
     }
-    state.particles = state.particles.filter(pt=>pt.life>0);
+    state.particles = state.particles.filter(pt => pt.life > 0);
 
-    if(state.shake>0) state.shake = Math.max(0, state.shake - dt*40);
-    if(state.switchFlash>0) state.switchFlash = Math.max(0, state.switchFlash - dt*4);
+    if(state.shake > 0) state.shake = Math.max(0, state.shake - dt * 40);
+    if(state.switchFlash > 0) state.switchFlash = Math.max(0, state.switchFlash - dt * 4);
 
     updateHUD();
   }
@@ -565,227 +757,244 @@
   function drawStars(t){
     ctx.save();
     for(const s of state.stars){
-      const rr = Math.min(W,H)*0.62*s.r;
-      const a = s.a + t*0.02*(s.r);
-      const x = cx + Math.cos(a)*rr;
-      const y = cy*0.9 + Math.sin(a)*rr*0.7;
-      const tw = 0.35+0.45*Math.sin(t*1.6+s.tw);
-      ctx.globalAlpha = Math.max(0,tw)*0.6;
+      const rr = Math.min(W, H) * 0.62 * s.r;
+      const a = s.a + t * 0.02 * s.r;
+      const x = screenCX + Math.cos(a) * rr;
+      const y = screenCY * 0.92 + Math.sin(a) * rr * 0.7;
+      const tw = 0.35 + 0.45 * Math.sin(t * 1.6 + s.tw);
+      ctx.globalAlpha = Math.max(0, tw) * 0.6;
       ctx.fillStyle = '#cfe0ff';
       ctx.beginPath();
-      ctx.arc(x,y,s.size,0,TWO_PI);
+      ctx.arc(x, y, s.size, 0, TWO_PI);
       ctx.fill();
     }
     ctx.restore();
   }
 
   function drawRing(ring, t, cam){
-    const r = effRingRadius(ring);
+    const center = worldToScreen(arenaCX, arenaCY, cam);
+    const r = effRingRadius(ring) * state.zoomCurrent;
     const color = RING_COLOR[ring];
-    const pulse = 1 + 0.035*Math.sin(t*state.angularSpeed*2.4 + ring*Math.PI);
+    const pulse = 1 + 0.02 * Math.sin(t * state.angularSpeed * 2.4 + ring * Math.PI);
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cam.vcx,cam.vcy,r*pulse,0,TWO_PI);
-    ctx.lineWidth = ringThickness;
+    ctx.arc(center.x, center.y, r * pulse, 0, TWO_PI);
+    ctx.lineWidth = ringThickness * state.zoomCurrent;
     ctx.strokeStyle = color;
     ctx.globalAlpha = 0.22;
     ctx.shadowColor = color;
     ctx.shadowBlur = 22;
     ctx.stroke();
     ctx.globalAlpha = 0.55;
-    ctx.lineWidth = ringThickness*0.35;
+    ctx.lineWidth = ringThickness * state.zoomCurrent * 0.35;
     ctx.shadowBlur = 10;
     ctx.stroke();
     ctx.restore();
   }
 
   function drawObstacles(cam){
+    const center = worldToScreen(arenaCX, arenaCY, cam);
     for(const o of state.obstacles){
-      if(o.resolved && o.ring!==state.playerRing) continue;
-      const r = effRingRadius(o.ring);
-      const a0 = o.angle, a1 = o.angle+o.width;
-      const active = (o.ring===state.playerRing) && !o.resolved;
+      if(o.resolved && o.ring !== state.playerRing) continue;
+      const r = effRingRadius(o.ring) * state.zoomCurrent;
+      const a0 = o.angle;
+      const a1 = o.angle + o.width;
+      const active = (o.ring === state.playerRing) && !o.resolved;
       ctx.save();
       ctx.beginPath();
-      ctx.arc(cam.vcx,cam.vcy,r,a0,a1);
-      ctx.lineWidth = ringThickness*2.1;
+      ctx.arc(center.x, center.y, r, a0, a1);
+      ctx.lineWidth = ringThickness * state.zoomCurrent * 2.15;
       ctx.strokeStyle = '#ff4d4d';
       ctx.lineCap = 'round';
       ctx.shadowColor = '#ff4d4d';
-      ctx.shadowBlur = active ? 26 : 14;
-      ctx.globalAlpha = active ? 1 : 0.85;
+      ctx.shadowBlur = active ? 28 : 14;
+      ctx.globalAlpha = active ? 1 : 0.9;
       ctx.stroke();
       ctx.restore();
     }
   }
 
   function drawGems(cam){
+    const center = worldToScreen(arenaCX, arenaCY, cam);
     for(const g of state.gems){
       if(g.taken) continue;
-      const r = effRingRadius(g.ring);
-      const x = cam.vcx+Math.cos(g.angle)*r;
-      const y = cam.vcy+Math.sin(g.angle)*r;
-      const s = 6.5;
+      const r = effRingRadius(g.ring) * state.zoomCurrent;
+      const p = pointOnRing(center.x, center.y, r, g.angle);
+      const s = 6.5 * state.zoomCurrent * 0.5;
       ctx.save();
-      ctx.translate(x,y);
-      ctx.rotate(g.angle+Math.PI/4);
+      ctx.translate(p.x, p.y);
+      ctx.rotate(g.angle + Math.PI / 4);
       ctx.fillStyle = '#3dffa0';
       ctx.shadowColor = '#3dffa0';
       ctx.shadowBlur = 16;
       ctx.beginPath();
-      ctx.moveTo(0,-s); ctx.lineTo(s,0); ctx.lineTo(0,s); ctx.lineTo(-s,0);
+      ctx.moveTo(0, -s);
+      ctx.lineTo(s, 0);
+      ctx.lineTo(0, s);
+      ctx.lineTo(-s, 0);
       ctx.closePath();
       ctx.fill();
       ctx.restore();
     }
   }
 
-  // Beam connecting the two tracks at the player's angle while a switch is in
-  // flight — makes the ring-change read as a deliberate jump, not a teleport.
   function drawSwitchBeam(cam){
-    const amt = transitionAmount();
+    const amt = Math.abs(state.playerRing - state.animRingT);
     if(amt < 0.015) return;
-    const rA = effRingRadius(0), rB = effRingRadius(1);
     const a = state.playerAngle;
-    const x0 = cam.vcx+Math.cos(a)*rA, y0 = cam.vcy+Math.sin(a)*rA;
-    const x1 = cam.vcx+Math.cos(a)*rB, y1 = cam.vcy+Math.sin(a)*rB;
+    const center = worldToScreen(arenaCX, arenaCY, cam);
+    const rA = effRingRadius(0) * state.zoomCurrent;
+    const rB = effRingRadius(1) * state.zoomCurrent;
+    const p0 = pointOnRing(center.x, center.y, rA, a);
+    const p1 = pointOnRing(center.x, center.y, rB, a);
     ctx.save();
-    ctx.globalAlpha = Math.min(1,amt*1.8)*0.7;
-    ctx.strokeStyle = lerpColor(RING_COLOR[0],RING_COLOR[1],state.animRingT);
+    ctx.globalAlpha = Math.min(1, amt * 1.8) * 0.75;
+    ctx.strokeStyle = lerpColor(RING_COLOR[0], RING_COLOR[1], state.animRingT);
     ctx.lineWidth = 3;
     ctx.shadowColor = '#ffffff';
     ctx.shadowBlur = 14;
     ctx.beginPath();
-    ctx.moveTo(x0,y0); ctx.lineTo(x1,y1);
+    ctx.moveTo(p0.x, p0.y);
+    ctx.lineTo(p1.x, p1.y);
     ctx.stroke();
     ctx.restore();
   }
 
-  function drawPlayer(){
-    const amt = transitionAmount();
-    const color = lerpColor(RING_COLOR[0],RING_COLOR[1],state.animRingT);
-    const squash = 1 - 0.35*Math.sin(Math.min(1,amt*2)*Math.PI);
+  function drawPlayer(cam){
+    const p = worldToScreen(playerWorldPos().x, playerWorldPos().y, cam);
+    const amt = Math.abs(state.playerRing - state.animRingT);
+    const color = lerpColor(RING_COLOR[0], RING_COLOR[1], state.animRingT);
+    const pulse = 1 - 0.25 * Math.sin(Math.min(1, amt * 2) * Math.PI);
     ctx.save();
-    ctx.translate(anchorX,anchorY);
-    ctx.scale(1/Math.max(0.55,squash), squash);
+    ctx.translate(p.x, p.y);
+    ctx.scale(1 / Math.max(0.7, pulse), pulse);
     ctx.beginPath();
-    ctx.arc(0,0, 9 + state.switchFlash*4, 0, TWO_PI);
+    ctx.arc(0, 0, 9 + state.switchFlash * 4, 0, TWO_PI);
     ctx.fillStyle = '#ffffff';
     ctx.shadowColor = color;
     ctx.shadowBlur = 28;
     ctx.fill();
     ctx.beginPath();
-    ctx.arc(0,0, 4, 0, TWO_PI);
+    ctx.arc(0, 0, 4, 0, TWO_PI);
     ctx.fillStyle = color;
     ctx.shadowBlur = 8;
     ctx.fill();
     ctx.restore();
   }
 
-  function drawParticles(){
+  function drawParticles(cam){
     for(const pt of state.particles){
-      const a = Math.max(0, pt.life/pt.maxLife);
+      const a = Math.max(0, pt.life / pt.maxLife);
+      const p = worldToScreen(pt.x, pt.y, cam);
       ctx.save();
       ctx.globalAlpha = a;
       ctx.fillStyle = `rgb(${pt.color})`;
       ctx.shadowColor = `rgb(${pt.color})`;
       ctx.shadowBlur = 8;
       ctx.beginPath();
-      ctx.arc(pt.x,pt.y,pt.size*a+1,0,TWO_PI);
+      ctx.arc(p.x, p.y, pt.size * a + 1, 0, TWO_PI);
       ctx.fill();
       ctx.restore();
     }
   }
 
   function drawCenter(cam){
-    const r = innerR*state.zoomCurrent*0.28;
+    const c = worldToScreen(arenaCX, arenaCY, cam);
+    const r = innerR * state.zoomCurrent * 0.26;
     ctx.save();
     ctx.beginPath();
-    ctx.arc(cam.vcx,cam.vcy, r, 0, TWO_PI);
-    const grad = ctx.createRadialGradient(cam.vcx,cam.vcy,0,cam.vcx,cam.vcy,r);
-    grad.addColorStop(0,'rgba(0,229,255,0.35)');
-    grad.addColorStop(1,'rgba(0,229,255,0)');
+    ctx.arc(c.x, c.y, r, 0, TWO_PI);
+    const grad = ctx.createRadialGradient(c.x, c.y, 0, c.x, c.y, r);
+    grad.addColorStop(0, 'rgba(0,229,255,0.35)');
+    grad.addColorStop(1, 'rgba(0,229,255,0)');
     ctx.fillStyle = grad;
     ctx.fill();
     ctx.restore();
   }
 
-  function render(t){
-    ctx.clearRect(0,0,W,H);
-    const bgGrad = ctx.createRadialGradient(cx,cy*0.9,10,cx,cy,Math.max(W,H)*0.75);
-    bgGrad.addColorStop(0,'#0b0e1e');
-    bgGrad.addColorStop(1,'#05060d');
-    ctx.fillStyle = bgGrad;
-    ctx.fillRect(0,0,W,H);
-
-    drawStars(t);
-
-    ctx.save();
-    if(state.shake>0){
-      const sx = (Math.random()-0.5)*state.shake;
-      const sy = (Math.random()-0.5)*state.shake;
-      ctx.translate(sx,sy);
-    }
-
-    const cam = computeCamera();
-    drawCenter(cam);
-    drawRing(0,t,cam);
-    drawRing(1,t,cam);
-    drawSpeedStreaks(cam);
-    drawObstacles(cam);
-    drawGems(cam);
-    drawSwitchBeam(cam);
-    drawPlayer();
-    drawParticles();
-
-    ctx.restore();
-  }
-
-  // Faint streaks trailing behind the anchor, opposite the direction of travel —
-  // a cheap but effective read on how fast things are moving.
   function drawSpeedStreaks(cam){
-    const n = 5;
-    const speedT = Math.min(1, (state.angularSpeed-SPEED_START)/(SPEED_MAX-SPEED_START));
-    if(speedT<=0) return;
-    const r = lerp(effRingRadius(0),effRingRadius(1),state.animRingT);
+    const speedT = Math.min(1, (state.angularSpeed - SPEED_START) / (SPEED_MAX - SPEED_START));
+    if(speedT <= 0) return;
+    const c = worldToScreen(arenaCX, arenaCY, cam);
+    const r = lerp(effRingRadius(0), effRingRadius(1), state.animRingT) * state.zoomCurrent;
     ctx.save();
-    for(let i=0;i<n;i++){
-      const back = state.playerAngle - 0.05 - i*0.035*(1+speedT);
-      const x = cam.vcx+Math.cos(back)*r;
-      const y = cam.vcy+Math.sin(back)*r;
-      ctx.globalAlpha = (1-i/n)*0.22*speedT;
-      ctx.fillStyle = lerpColor(RING_COLOR[0],RING_COLOR[1],state.animRingT);
+    for(let i = 0; i < 5; i++){
+      const back = state.playerAngle - 0.05 - i * 0.035 * (1 + speedT);
+      const p = pointOnRing(c.x, c.y, r, back);
+      ctx.globalAlpha = (1 - i / 5) * 0.22 * speedT;
+      ctx.fillStyle = lerpColor(RING_COLOR[0], RING_COLOR[1], state.animRingT);
       ctx.beginPath();
-      ctx.arc(x,y,2.5,0,TWO_PI);
+      ctx.arc(p.x, p.y, 2.5, 0, TWO_PI);
       ctx.fill();
     }
     ctx.restore();
   }
 
+  function render(t){
+    ctx.clearRect(0, 0, W, H);
+    const bgGrad = ctx.createRadialGradient(screenCX, screenCY * 0.92, 10, screenCX, screenCY, Math.max(W, H) * 0.8);
+    bgGrad.addColorStop(0, '#0b0e1e');
+    bgGrad.addColorStop(1, '#05060d');
+    ctx.fillStyle = bgGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    drawStars(t);
+
+    ctx.save();
+    if(state.shake > 0){
+      const sx = (Math.random() - 0.5) * state.shake;
+      const sy = (Math.random() - 0.5) * state.shake;
+      ctx.translate(sx, sy);
+    }
+
+    const cam = { x: state.cameraX, y: state.cameraY };
+    drawCenter(cam);
+    drawRing(0, t, cam);
+    drawRing(1, t, cam);
+    drawSpeedStreaks(cam);
+    drawObstacles(cam);
+    drawGems(cam);
+    drawSwitchBeam(cam);
+    drawPlayer(cam);
+    drawParticles(cam);
+
+    ctx.restore();
+  }
+
   // ---------- Main loop ----------
   function frame(now){
-    if(lastTime==null) lastTime = now;
-    let dt = (now-lastTime)/1000;
+    if(lastTime == null) lastTime = now;
+    let dt = (now - lastTime) / 1000;
     lastTime = now;
     dt = Math.min(dt, 0.033);
 
-    if(state.mode==='playing'){
+    if(state.mode === 'playing'){
       update(dt);
     } else {
+      updateCamera(dt);
       for(const pt of state.particles){
-        pt.x += pt.vx*dt; pt.y += pt.vy*dt;
-        pt.vx *= (1-3.2*dt); pt.vy *= (1-3.2*dt);
+        pt.x += pt.vx * dt;
+        pt.y += pt.vy * dt;
+        pt.vx *= (1 - 3.2 * dt);
+        pt.vy *= (1 - 3.2 * dt);
         pt.life -= dt;
       }
-      state.particles = state.particles.filter(pt=>pt.life>0);
-      if(state.shake>0) state.shake = Math.max(0, state.shake - dt*40);
+      state.particles = state.particles.filter(pt => pt.life > 0);
+      if(state.shake > 0) state.shake = Math.max(0, state.shake - dt * 40);
     }
-    render(now/1000);
+
+    render(now / 1000);
     requestAnimationFrame(frame);
   }
-  requestAnimationFrame(frame);
 
+  resize();
+  computeDifficulty();
+  state.cameraX = arenaCX;
+  state.cameraY = arenaCY;
+  updateBestDisplay();
+  requestAnimationFrame(frame);
 })();
 </script>
+
 </body>
 </html>
