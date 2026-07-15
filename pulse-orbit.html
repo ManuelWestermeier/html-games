@@ -376,6 +376,11 @@
     playerAngle: -Math.PI / 2,
     prevPlayerAngle: -Math.PI / 2,
     playerRing: 0,
+    ringTransitionActive: false,
+    ringTransitionFrom: 0,
+    ringTransitionTo: 0,
+    ringTransitionT: 0,
+    ringTransitionDuration: 0.18,
     angularSpeed: 1.05,
     obstacles: [],
     gems: [],
@@ -411,8 +416,19 @@
   function ringRadius(ring){ return ring === 0 ? innerR : outerR; }
   function effRingRadius(ring){ return ringRadius(ring) * state.zoomCurrent; }
   function comboMultiplier(){ return 1 + Math.min(4, Math.floor(state.combo / 5)); }
+  function currentRingValue(){
+    if(!state.ringTransitionActive) return state.playerRing;
+    return lerp(state.ringTransitionFrom, state.ringTransitionTo, easeInOut(clamp(state.ringTransitionT, 0, 1)));
+  }
+  function currentCollisionRing(){
+    if(!state.ringTransitionActive) return state.playerRing;
+    return state.ringTransitionT < 0.5 ? state.ringTransitionFrom : state.ringTransitionTo;
+  }
+  function currentVisualRingRadius(){
+    return lerp(ringRadius(0), ringRadius(1), currentRingValue());
+  }
   function playerWorldPos(){
-    const radius = effRingRadius(state.playerRing);
+    const radius = currentVisualRingRadius() * state.zoomCurrent;
     return pointOnRing(arenaCX, arenaCY, radius, state.playerAngle);
   }
   function targetCamera(){
@@ -562,11 +578,17 @@
   }
   function switchRing(){
     if(state.mode !== 'playing') return;
-    state.playerRing = 1 - state.playerRing;
+    if(state.ringTransitionActive) return;
+    const fromRing = state.playerRing;
+    const toRing = 1 - fromRing;
+    state.ringTransitionActive = true;
+    state.ringTransitionFrom = fromRing;
+    state.ringTransitionTo = toRing;
+    state.ringTransitionT = 0;
     state.switchFlash = 1;
     playSwitch();
     const p = playerPosForFX();
-    burst(p.x, p.y, RING_COLOR_RGB[state.playerRing], 12, 100, 0.45);
+    burst(p.x, p.y, RING_COLOR_RGB[toRing], 12, 100, 0.45);
   }
   function handlePrimaryInput(){
     ensureAudio();
@@ -620,6 +642,10 @@
     state.playerAngle = -Math.PI / 2;
     state.prevPlayerAngle = state.playerAngle;
     state.playerRing = 0;
+    state.ringTransitionActive = false;
+    state.ringTransitionFrom = 0;
+    state.ringTransitionTo = 0;
+    state.ringTransitionT = 0;
     state.obstacles = [];
     state.gems = [];
     state.nextSpawnAngle = state.playerAngle + Math.PI * 0.42;
@@ -682,9 +708,20 @@
     state.sinceStart += dt;
     state.prevPlayerAngle = state.playerAngle;
     state.playerAngle += state.angularSpeed * dt;
+
+    if(state.ringTransitionActive){
+      state.ringTransitionT += dt / state.ringTransitionDuration;
+      if(state.ringTransitionT >= 1){
+        state.ringTransitionT = 1;
+        state.playerRing = state.ringTransitionTo;
+        state.ringTransitionActive = false;
+      }
+    }
+
     spawnAhead();
     const sweepStart = Math.min(state.prevPlayerAngle, state.playerAngle) - MARGIN;
     const sweepEnd = Math.max(state.prevPlayerAngle, state.playerAngle) + MARGIN;
+    const collisionRing = currentCollisionRing();
     for(const o of state.obstacles){
       if(o.resolved) continue;
       const obstStart = o.angle;
@@ -700,7 +737,7 @@
         continue;
       }
       if(obstStart > sweepEnd) continue; // still ahead, not reached yet
-      if(o.ring === state.playerRing){
+      if(o.ring === collisionRing){
         o.resolved = true;
         o.resolvedAt = state.sinceStart;
         endGame();
@@ -731,7 +768,7 @@
       }
       if(g.angle > sweepEnd) continue; // not reached yet
       g.taken = true;
-      if(g.ring === state.playerRing){
+      if(g.ring === collisionRing){
         const prevMult = comboMultiplier();
         state.combo++;
         const mult = comboMultiplier();
@@ -756,7 +793,7 @@
     }
     const zoomTarget = targetZoom();
     state.zoomCurrent += (zoomTarget - state.zoomCurrent) * Math.min(1, dt * 2.6);
-    state.animRingT += (state.playerRing - state.animRingT) * Math.min(1, dt * 13);
+    state.animRingT += (currentRingValue() - state.animRingT) * Math.min(1, dt * 13);
     updateCamera(dt);
     for(const pt of state.particles){
       pt.x += pt.vx * dt;
@@ -821,7 +858,7 @@
       const r = effRingRadius(o.ring) * state.zoomCurrent;
       const a0 = o.angle;
       const a1 = o.angle + o.width;
-      const active = (o.ring === state.playerRing) && !o.resolved;
+      const active = (o.ring === currentCollisionRing()) && !o.resolved;
       const edgeGlow = 0.25 + 0.75 * intro;
       const drawRadius = r * (0.82 + 0.18 * pop);
       ctx.save();
@@ -884,7 +921,7 @@
     }
   }
   function drawSwitchBeam(cam){
-    const amt = Math.abs(state.playerRing - state.animRingT);
+    const amt = Math.abs(currentRingValue() - state.animRingT);
     if(amt < 0.015) return;
     const a = state.playerAngle;
     const center = worldToScreen(arenaCX, arenaCY, cam);
@@ -906,7 +943,7 @@
   }
   function drawPlayer(cam){
     const p = worldToScreen(playerWorldPos().x, playerWorldPos().y, cam);
-    const amt = Math.abs(state.playerRing - state.animRingT);
+    const amt = Math.abs(currentRingValue() - state.animRingT);
     const color = lerpColor(RING_COLOR[0], RING_COLOR[1], state.animRingT);
     const pulse = 1 - 0.25 * Math.sin(Math.min(1, amt * 2) * Math.PI);
     ctx.save();
